@@ -4,7 +4,7 @@
 'use strict';
 const CFG = window.DD_CONFIG || {};
 const DEMO = !CFG.SUPABASE_URL;
-const APP_VERSION = '1.0.3';
+const APP_VERSION = '1.2.0';
 
 // ---------------------------------------------------------------- utils
 const $ = (s, el = document) => el.querySelector(s);
@@ -220,27 +220,67 @@ function dailyPriceModal() {
     assocPriceModal();
   });
 }
+// ดึงราคาประกาศล่าสุดของสมาคมค้าทองคำ: ผ่านเซิร์ฟเวอร์ก่อน ถ้าไม่ได้ใช้โปรแกรมในคอมร้าน
+async function fetchAssoc() {
+  let err = null;
+  if (!DEMO && S.session.token && S.online) {
+    try { return { ...(await api('fetch_gold_assoc', { p_token: S.session.token })), via: 'เซิร์ฟเวอร์' }; } catch (e) { err = e; }
+  }
+  try {
+    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 20000);
+    const r = await fetch((CFG.HELPER_URL || 'http://127.0.0.1:8765') + '/goldprice', { signal: ctrl.signal }).then(x => x.json()).finally(() => clearTimeout(t));
+    if (r.ok) return { ...r.data, via: 'คอมร้าน' };
+    err = new Error(r.error || 'FETCH_FAIL');
+  } catch (e) { err = err || new Error('NO_HELPER'); }
+  throw err;
+}
+function assocAsOf(d) {
+  if (!d) return '';
+  if (d.as_time && /^\d{4}-\d{2}-\d{2}T/.test(d.as_time)) return thDateTime(d.as_time) + (d.seq ? ` (ครั้งที่ ${d.seq})` : '');
+  return d.as_of || '';
+}
+const ASSOC_ERR = { FETCH_FAIL: 'เชื่อมต่อเว็บสมาคมไม่ได้', PARSE_FAIL: 'อ่านราคาจากเว็บสมาคมไม่ได้ (เว็บอาจเปลี่ยนรูปแบบ)', NO_HELPER: 'ดึงราคาไม่ได้ — เปิดโปรแกรมเครื่องอ่านบัตรเวอร์ชันใหม่ในคอมก่อน' };
+
 function assocPriceModal() {
   const P = deepCopy(S.settings.prices), gold = P.metals.gold;
-  modal(`<h2>ราคาสมาคมวันนี้</h2>
-    <p class="muted sm">ดูราคาได้ที่เว็บสมาคมค้าทองคำ (goldtraders.or.th) ช่อง "ทองรูปพรรณ รับซื้อ"</p>
-    <label>ทองรูปพรรณ 96.5% รับซื้อ (บาทละ)<input id="ap" inputmode="decimal" value="${esc(P.assoc_buy_per_baht || '')}" autofocus placeholder="เช่น 60,512"></label>
+  let data = null, base = (P.assoc && P.assoc.base) || 'orn_buy';
+  modal(`<h2>ราคาสมาคมค้าทองคำ</h2>
+    <div id="asBox"><div class="center" style="min-height:120px"><span class="spin big"></span></div><p class="muted center-t">กำลังดึงราคาล่าสุดจากเว็บสมาคม...</p></div>
+    <label>ใช้ราคาไหนเป็นราคาทอง 96.5%<select id="abase"><option value="orn_buy">รับซื้อทองรูปพรรณ (แนะนำ)</option><option value="bar_buy">รับซื้อทองคำแท่ง</option></select></label>
+    <label>ราคาฐาน 96.5% (บาทละ) — แก้เองได้<input id="ap" inputmode="decimal" value="${esc(P.assoc_buy_per_baht || '')}"></label>
     <p id="apg" class="big"></p>
     <label class="switch"><input type="checkbox" id="aprop"> ปรับราคาขั้น % อื่นของทองตามสัดส่วนด้วย</label>
     <div id="aprev" class="muted sm"></div>
-    <div class="row end"><button class="btn ghost" id="apBack">ย้อนกลับ</button><button class="btn gold" id="apSave">ใช้ราคานี้</button></div>`, { sticky: true });
+    <div class="row end"><button class="btn ghost" id="apBack">ย้อนกลับ</button><button class="btn ghost" id="apRe">ดึงใหม่</button><button class="btn gold" id="apSave">ใช้ราคานี้</button></div>`, { sticky: true });
+  $('#abase').value = base;
   const calcTiers = (p965) => (gold.tiers || []).map(t => ({ pct: t.pct, price: t.pct === 96.5 ? p965 : Math.floor(p965 * t.pct / 96.5 / 10) * 10 }));
   const draw = () => {
     const v = num($('#ap').value), p965 = Math.round(v / 15.244);
     $('#apg').innerHTML = v ? `96.5% = <b>${money(p965)}</b> บาท/กรัม` : '';
     $('#aprev').innerHTML = v && $('#aprop').checked ? 'ราคาที่จะใช้: ' + calcTiers(p965).map(t => `${t.pct}% = ${money(t.price)}`).join(' · ') : (v ? 'ขั้น % อื่นใช้ราคาเดิม: ' + (gold.tiers || []).filter(t => t.pct !== 96.5).map(t => `${t.pct}% = ${money(t.price)}`).join(' · ') : '');
   };
-  $('#ap').oninput = draw; $('#aprop').onchange = draw; draw();
+  const load = async () => {
+    $('#asBox').innerHTML = '<div class="center" style="min-height:120px"><span class="spin big"></span></div><p class="muted center-t">กำลังดึงราคาล่าสุดจากเว็บสมาคม...</p>';
+    try {
+      data = await fetchAssoc();
+      $('#asBox').innerHTML = `<table class="assoc"><thead><tr><th></th><th>รับซื้อ</th><th>ขายออก</th></tr></thead><tbody>
+        <tr><td>ทองคำแท่ง 96.5%</td><td>${money(data.bar_buy, 2)}</td><td>${money(data.bar_sell, 2)}</td></tr>
+        <tr><td>ทองรูปพรรณ 96.5%</td><td><b>${money(data.orn_buy, 2)}</b></td><td>${money(data.orn_sell, 2)}</td></tr></tbody></table>
+        <p class="muted sm">ประกาศ ${esc(assocAsOf(data) || '-')} · ดึงผ่าน${esc(data.via)} · goldtraders.or.th</p>`;
+      $('#ap').value = data[$('#abase').value]; draw();
+    } catch (e) {
+      $('#asBox').innerHTML = `<div class="banner warn">${esc(ASSOC_ERR[e.message] || errText(e))} — ใส่ราคาเองในช่องด้านล่างได้</div>`;
+    }
+  };
+  $('#abase').onchange = () => { if (data) { $('#ap').value = data[$('#abase').value]; } draw(); };
+  $('#ap').oninput = draw; $('#aprop').onchange = draw; draw(); load();
+  $('#apRe').onclick = load;
   $('#apBack').onclick = dailyPriceModal;
   $('#apSave').onclick = async (ev) => {
     const v = num($('#ap').value); if (!v) return toast('ใส่ราคาสมาคม', 'err');
     const p965 = Math.round(v / 15.244);
     P.assoc_mode = true; P.assoc_buy_per_baht = v; P.date = bkkDate();
+    P.assoc = data ? { bar_buy: data.bar_buy, bar_sell: data.bar_sell, orn_buy: data.orn_buy, orn_sell: data.orn_sell, as_of: assocAsOf(data), base: $('#abase').value } : { base: $('#abase').value, manual: true };
     if ($('#aprop').checked) gold.tiers = calcTiers(p965);
     if (!gold.tiers.some(t => t.pct === 96.5)) gold.tiers.push({ pct: 96.5, price: p965 });
     gold.tiers.forEach(t => { if (t.pct === 96.5) t.price = p965; });
@@ -436,7 +476,7 @@ function renderBuy() {
   const stale = pricesDate !== bkkDate();
   const tiers = tiersFor(e.metal);
   shell('รับซื้อ', `
-  ${!stale && isOwner() ? `<div class="banner info">ราคาวันนี้ตั้งแล้ว${S.settings.prices.assoc_mode && S.settings.prices.assoc_buy_per_baht ? ` · สมาคม ${money(S.settings.prices.assoc_buy_per_baht)} บาท/บาททอง` : ''} <button class="btn sm ghost" id="setTodayPrice">เปลี่ยนราคา</button></div>` : ''}
+  ${!stale && isOwner() ? `<div class="banner info"><span>ราคาวันนี้ตั้งแล้ว${assocLine()}</span> <button class="btn sm ghost" id="setTodayPrice">เปลี่ยนราคา</button></div>` : ''}
   ${stale && isOwner() ? `<div class="banner warn">ราคายังไม่ได้อัปเดตวันนี้ <button class="btn sm" id="setTodayPrice">ตั้งราคาวันนี้</button></div>` : stale ? '<div class="banner warn">ราคายังไม่ได้อัปเดตวันนี้ — แจ้งเจ้าของ</div>' : ''}
   <div class="stepper"><button data-step="1" class="${S.buyStep === 1 ? 'on' : ''} ${c ? 'done' : ''}">1 ผู้ขาย</button><button data-step="2" class="${S.buyStep === 2 ? 'on' : ''} ${B.items.length ? 'done' : ''}">2 รายการ</button><button data-step="3" class="${S.buyStep === 3 ? 'on' : ''}">3 จ่ายเงิน</button></div>
   <div class="buy-grid" data-step="${S.buyStep}">
@@ -498,6 +538,12 @@ function renderBuy() {
     </section>
   </div>`);
   bindBuy();
+}
+function assocLine() {
+  const P = S.settings.prices, A = P.assoc;
+  if (!P.assoc_mode) return ' · ตั้งราคาเอง';
+  if (A && A.orn_buy) return ` · สมาคม${A.as_of ? ' (' + esc(A.as_of) + ')' : ''}: แท่ง รับ ${money(A.bar_buy)} / ขาย ${money(A.bar_sell)} · รูปพรรณ รับ ${money(A.orn_buy)} / ขาย ${money(A.orn_sell)}`;
+  return ` · ฐาน 96.5% ${money(P.assoc_buy_per_baht)} บาท/บาททอง`;
 }
 function cardExpired(exp) { const m = String(exp).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); if (!m) return false; let y = +m[3]; if (y > 2400) y -= 543; return new Date(y, +m[2] - 1, +m[1]) < now(); }
 
