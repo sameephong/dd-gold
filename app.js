@@ -4,7 +4,7 @@
 'use strict';
 const CFG = window.DD_CONFIG || {};
 const DEMO = !CFG.SUPABASE_URL;
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.0.1';
 
 // ---------------------------------------------------------------- utils
 const $ = (s, el = document) => el.querySelector(s);
@@ -447,7 +447,7 @@ function cardExpired(exp) { const m = String(exp).match(/(\d{1,2})\/(\d{1,2})\/(
 function bindBuy() {
   const B = S.buy, e = B.entry;
   $$('[data-go2]').forEach(b => b.onclick = () => go(b.dataset.go2));
-  $$('[data-step]').forEach(b => b.onclick = () => { S.buyStep = +b.dataset.step; renderBuy(); });
+  $$('.stepper [data-step]').forEach(b => b.onclick = () => { S.buyStep = +b.dataset.step; renderBuy(); });
   $$('[data-next]').forEach(b => b.onclick = () => { S.buyStep = +b.dataset.next; renderBuy(); });
   const rc = $('#readCard'); if (rc) rc.onclick = readCard;
   const fc = $('#findCust'); if (fc) fc.onclick = () => customerSearchModal(c => { setCustomer(c); });
