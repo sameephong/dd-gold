@@ -4,7 +4,7 @@
 'use strict';
 const CFG = window.DD_CONFIG || {};
 const DEMO = !CFG.SUPABASE_URL;
-const APP_VERSION = '1.0.2';
+const APP_VERSION = '1.0.3';
 
 // ---------------------------------------------------------------- utils
 const $ = (s, el = document) => el.querySelector(s);
@@ -436,6 +436,7 @@ function renderBuy() {
   const stale = pricesDate !== bkkDate();
   const tiers = tiersFor(e.metal);
   shell('รับซื้อ', `
+  ${!stale && isOwner() ? `<div class="banner info">ราคาวันนี้ตั้งแล้ว${S.settings.prices.assoc_mode && S.settings.prices.assoc_buy_per_baht ? ` · สมาคม ${money(S.settings.prices.assoc_buy_per_baht)} บาท/บาททอง` : ''} <button class="btn sm ghost" id="setTodayPrice">เปลี่ยนราคา</button></div>` : ''}
   ${stale && isOwner() ? `<div class="banner warn">ราคายังไม่ได้อัปเดตวันนี้ <button class="btn sm" id="setTodayPrice">ตั้งราคาวันนี้</button></div>` : stale ? '<div class="banner warn">ราคายังไม่ได้อัปเดตวันนี้ — แจ้งเจ้าของ</div>' : ''}
   <div class="stepper"><button data-step="1" class="${S.buyStep === 1 ? 'on' : ''} ${c ? 'done' : ''}">1 ผู้ขาย</button><button data-step="2" class="${S.buyStep === 2 ? 'on' : ''} ${B.items.length ? 'done' : ''}">2 รายการ</button><button data-step="3" class="${S.buyStep === 3 ? 'on' : ''}">3 จ่ายเงิน</button></div>
   <div class="buy-grid" data-step="${S.buyStep}">
@@ -782,12 +783,12 @@ async function customerDetail(c) {
 function renderMore() {
   const items = [
     ['pin', 'เปลี่ยน PIN / ชื่อเล่นของฉัน', 'ทุกคน'],
-    ...(isOwner() ? [['settings', 'ตั้งค่าราคา & ร้าน', 'เจ้าของ'], ['staff', 'จัดการพนักงาน', 'เจ้าของ'], ['audit', 'ประวัติการใช้งาน (ตรวจสอบ)', 'เจ้าของ']] : [])
+    ...(isOwner() ? [['todayprice', 'ตั้งราคาวันนี้ / เปลี่ยนราคาระหว่างวัน', 'เจ้าของ'], ['settings', 'ตั้งค่าราคา & ร้าน', 'เจ้าของ'], ['staff', 'จัดการพนักงาน', 'เจ้าของ'], ['audit', 'ประวัติการใช้งาน (ตรวจสอบ)', 'เจ้าของ']] : [])
   ];
   shell('เพิ่มเติม', `<div class="card list">${items.map(i => `<button class="list-row" data-go3="${i[0]}"><b>${i[1]}</b><span class="muted sm">${i[2]} ›</span></button>`).join('')}</div>
     <div class="card"><h2>เครื่องนี้</h2><p class="muted sm">เครื่อง ${esc(S.device.device_id)} · ${esc(S.device.name)} · เวอร์ชัน ${APP_VERSION}${DEMO ? ' · โหมดทดลอง' : ''}</p>
     <div class="row"><button class="btn ghost" id="testPrint">ทดสอบพิมพ์</button><button class="btn ghost" id="testCard">ทดสอบเครื่องอ่านบัตร</button></div></div>`);
-  $$('[data-go3]').forEach(b => b.onclick = () => go(b.dataset.go3));
+  $$('[data-go3]').forEach(b => b.onclick = () => b.dataset.go3 === 'todayprice' ? dailyPriceModal() : go(b.dataset.go3));
   $('#testPrint').onclick = () => printReceipt({ bill_no: 'TEST-0000', created_at: now().toISOString(), staff_code: me().code, customer: { name: 'ทดสอบพิมพ์', id_card: '1234567890123' }, items: [{ metal: 'gold', kind: 'ทดสอบ', pct: 96.5, weight: 1, price_per_g: 1000, amount: 1000 }], total: 1000, pay_cash: 1000, pay_transfer: 0 }, me());
   $('#testCard').onclick = async () => { try { const r = await fetch((CFG.HELPER_URL || 'http://127.0.0.1:8765') + '/status').then(x => x.json()); toast(r.reader ? 'เจอเครื่องอ่าน: ' + r.reader : 'โปรแกรมทำงาน แต่ไม่เจอเครื่องอ่านบัตร', r.reader ? 'ok' : 'warn'); } catch (e) { toast('ไม่พบโปรแกรมเครื่องอ่านบัตรในเครื่องนี้', 'err'); } };
 }
