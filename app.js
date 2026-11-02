@@ -4,7 +4,7 @@
 'use strict';
 const CFG = window.DD_CONFIG || {};
 const DEMO = !CFG.SUPABASE_URL;
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.2.1';
 
 // ---------------------------------------------------------------- utils
 const $ = (s, el = document) => el.querySelector(s);
@@ -74,6 +74,17 @@ const idb = (() => {
   }));
   const run = async (st, mode, fn) => { const d = await open(); return new Promise((res, rej) => { const t = d.transaction(st, mode); const req = fn(t.objectStore(st)); let out; if (req) req.onsuccess = () => { out = req.result; }; t.oncomplete = () => res(out); t.onerror = () => rej(t.error); }); };
   return { put: (s, v) => run(s, 'readwrite', o => o.put(v)), get: (s, k) => run(s, 'readonly', o => o.get(k)), all: (s) => run(s, 'readonly', o => o.getAll()), del: (s, k) => run(s, 'readwrite', o => o.delete(k)) };
+})();
+
+// ---------------------------------------------------------------- เปลี่ยนจากโหมดทดลองเป็นฐานข้อมูลจริง → ล้างข้อมูลทดลองในเครื่อง
+(function resetIfBackendChanged() {
+  const cur = DEMO ? 'demo' : CFG.SUPABASE_URL;
+  let prev = null; try { prev = localStorage.getItem('dd_backend'); } catch (e) { /* ignore */ }
+  if ((prev !== null && prev !== cur) || (prev === null && !DEMO)) {
+    try { Object.keys(localStorage).filter(k => k.startsWith('dd_') && k !== 'dd_demo_db').forEach(k => localStorage.removeItem(k)); } catch (e) { /* ignore */ }
+    try { indexedDB.deleteDatabase('dd_shop'); } catch (e) { /* ignore */ }
+  }
+  try { localStorage.setItem('dd_backend', cur); } catch (e) { /* ignore */ }
 })();
 
 // ---------------------------------------------------------------- state
