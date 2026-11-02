@@ -4,7 +4,7 @@
 'use strict';
 const CFG = window.DD_CONFIG || {};
 const DEMO = !CFG.SUPABASE_URL;
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.0.2';
 
 // ---------------------------------------------------------------- utils
 const $ = (s, el = document) => el.querySelector(s);
@@ -195,6 +195,62 @@ function go(screen) {
   S.screen = screen;
   window.scrollTo(0, 0);
   ({ buy: renderBuy, bills: renderBills, customers: renderCustomers, more: renderMore, settings: renderSettings, staff: renderStaff, audit: renderAudit, pin: renderPin }[screen] || renderBuy)();
+  // เจ้าของเข้าระบบวันแรกของวัน และยังไม่ได้ตั้งราคาวันนี้ → ถามว่าจะใช้ราคาแบบไหน
+  if (isOwner() && S.session.token && screen !== 'pin' && S.settings && S.settings.prices && S.settings.prices.date !== bkkDate() && S.priceAsked !== bkkDate()) {
+    S.priceAsked = bkkDate(); setTimeout(dailyPriceModal, 200);
+  }
+}
+
+// ---------------------------------------------------------------- ราคาประจำวัน
+function dailyPriceModal() {
+  const P = S.settings.prices, last = P.date ? P.date.split('-').reverse().join('/') : 'ยังไม่เคยตั้ง';
+  modal(`<h2>ตั้งราคารับซื้อวันนี้</h2>
+    <p class="muted">${esc(thDateLong(now()))} · ราคาล่าสุดตั้งเมื่อ ${esc(last)}</p>
+    <p><b>วันนี้จะใช้ราคาแบบไหน?</b></p>
+    <div class="choice-list">
+      <button class="choice" data-pc="assoc"><b>ใช้ราคาสมาคมค้าทองคำ</b><span>ใส่ราคารับซื้อทองรูปพรรณ 96.5% (บาทละ) แล้วระบบคำนวณราคาต่อกรัมให้</span></button>
+      <button class="choice" data-pc="manual"><b>ตั้งราคาเองทุกขั้น %</b><span>ไปหน้าตั้งราคา ใส่ราคาต่อกรัมเองทีละขั้น</span></button>
+      <button class="choice" data-pc="same"><b>ใช้ราคาเดิมต่อ</b><span>ราคาเหมือนครั้งล่าสุด ไม่เปลี่ยนแปลง</span></button>
+    </div>
+    <div class="row end"><button class="btn ghost" onclick="closeModal()">ไว้ทีหลัง</button></div>`, { sticky: true });
+  $$('[data-pc]').forEach(b => b.onclick = async () => {
+    const c = b.dataset.pc;
+    if (c === 'manual') { closeModal(); setTab = 'prices'; go('settings'); return; }
+    if (c === 'same') { await savePrices({ ...deepCopy(P), date: bkkDate() }); closeModal(); go(S.screen); return; }
+    assocPriceModal();
+  });
+}
+function assocPriceModal() {
+  const P = deepCopy(S.settings.prices), gold = P.metals.gold;
+  modal(`<h2>ราคาสมาคมวันนี้</h2>
+    <p class="muted sm">ดูราคาได้ที่เว็บสมาคมค้าทองคำ (goldtraders.or.th) ช่อง "ทองรูปพรรณ รับซื้อ"</p>
+    <label>ทองรูปพรรณ 96.5% รับซื้อ (บาทละ)<input id="ap" inputmode="decimal" value="${esc(P.assoc_buy_per_baht || '')}" autofocus placeholder="เช่น 60,512"></label>
+    <p id="apg" class="big"></p>
+    <label class="switch"><input type="checkbox" id="aprop"> ปรับราคาขั้น % อื่นของทองตามสัดส่วนด้วย</label>
+    <div id="aprev" class="muted sm"></div>
+    <div class="row end"><button class="btn ghost" id="apBack">ย้อนกลับ</button><button class="btn gold" id="apSave">ใช้ราคานี้</button></div>`, { sticky: true });
+  const calcTiers = (p965) => (gold.tiers || []).map(t => ({ pct: t.pct, price: t.pct === 96.5 ? p965 : Math.floor(p965 * t.pct / 96.5 / 10) * 10 }));
+  const draw = () => {
+    const v = num($('#ap').value), p965 = Math.round(v / 15.244);
+    $('#apg').innerHTML = v ? `96.5% = <b>${money(p965)}</b> บาท/กรัม` : '';
+    $('#aprev').innerHTML = v && $('#aprop').checked ? 'ราคาที่จะใช้: ' + calcTiers(p965).map(t => `${t.pct}% = ${money(t.price)}`).join(' · ') : (v ? 'ขั้น % อื่นใช้ราคาเดิม: ' + (gold.tiers || []).filter(t => t.pct !== 96.5).map(t => `${t.pct}% = ${money(t.price)}`).join(' · ') : '');
+  };
+  $('#ap').oninput = draw; $('#aprop').onchange = draw; draw();
+  $('#apBack').onclick = dailyPriceModal;
+  $('#apSave').onclick = async (ev) => {
+    const v = num($('#ap').value); if (!v) return toast('ใส่ราคาสมาคม', 'err');
+    const p965 = Math.round(v / 15.244);
+    P.assoc_mode = true; P.assoc_buy_per_baht = v; P.date = bkkDate();
+    if ($('#aprop').checked) gold.tiers = calcTiers(p965);
+    if (!gold.tiers.some(t => t.pct === 96.5)) gold.tiers.push({ pct: 96.5, price: p965 });
+    gold.tiers.forEach(t => { if (t.pct === 96.5) t.price = p965; });
+    busy(ev.target, true);
+    if (await savePrices(P)) { closeModal(); go(S.screen); } else busy(ev.target, false);
+  };
+}
+async function savePrices(P) {
+  try { await api('save_setting', { p_token: S.session.token, p_key: 'prices', p_value: P }); S.settings.prices = P; store('dd_settings', S.settings); toast('ตั้งราคาวันนี้แล้ว'); return true; }
+  catch (e) { toast(errText(e), 'err'); return false; }
 }
 
 // ---------------------------------------------------------------- boot
@@ -380,7 +436,7 @@ function renderBuy() {
   const stale = pricesDate !== bkkDate();
   const tiers = tiersFor(e.metal);
   shell('รับซื้อ', `
-  ${stale && isOwner() ? `<div class="banner warn">ราคายังไม่ได้อัปเดตวันนี้ <button class="btn sm" data-go2="settings">ตั้งราคา</button></div>` : stale ? '<div class="banner warn">ราคายังไม่ได้อัปเดตวันนี้ — แจ้งเจ้าของ</div>' : ''}
+  ${stale && isOwner() ? `<div class="banner warn">ราคายังไม่ได้อัปเดตวันนี้ <button class="btn sm" id="setTodayPrice">ตั้งราคาวันนี้</button></div>` : stale ? '<div class="banner warn">ราคายังไม่ได้อัปเดตวันนี้ — แจ้งเจ้าของ</div>' : ''}
   <div class="stepper"><button data-step="1" class="${S.buyStep === 1 ? 'on' : ''} ${c ? 'done' : ''}">1 ผู้ขาย</button><button data-step="2" class="${S.buyStep === 2 ? 'on' : ''} ${B.items.length ? 'done' : ''}">2 รายการ</button><button data-step="3" class="${S.buyStep === 3 ? 'on' : ''}">3 จ่ายเงิน</button></div>
   <div class="buy-grid" data-step="${S.buyStep}">
     <section class="card" data-card="1">
@@ -446,7 +502,7 @@ function cardExpired(exp) { const m = String(exp).match(/(\d{1,2})\/(\d{1,2})\/(
 
 function bindBuy() {
   const B = S.buy, e = B.entry;
-  $$('[data-go2]').forEach(b => b.onclick = () => go(b.dataset.go2));
+  const stp = $('#setTodayPrice'); if (stp) stp.onclick = dailyPriceModal;
   $$('.stepper [data-step]').forEach(b => b.onclick = () => { S.buyStep = +b.dataset.step; renderBuy(); });
   $$('[data-next]').forEach(b => b.onclick = () => { S.buyStep = +b.dataset.next; renderBuy(); });
   const rc = $('#readCard'); if (rc) rc.onclick = readCard;

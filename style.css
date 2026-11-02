@@ -181,3 +181,8 @@ h2{font-size:18px}
   #app,#toasts,.modal-wrap{display:none!important}
   #print{display:block}
 }
+
+.choice-list{display:flex;flex-direction:column;gap:8px;margin:8px 0}
+.choice{display:flex;flex-direction:column;gap:2px;text-align:left;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:#fff;cursor:pointer}
+.choice b{font-size:17px} .choice span{font-size:13px;color:var(--muted)}
+.choice:hover{border-color:var(--gold);background:#FFFBEF}
