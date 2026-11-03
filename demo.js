@@ -13,6 +13,7 @@
         platinum: { label: 'แพลทินัม', tiers: [], kinds: ['เครื่องประดับ', 'เศษ', 'อื่นๆ'] }
       }
     },
+    cancel: { enabled: false, limit: 20000, today_only: true },
     receipt: { copies: 1, consent: 'ข้าพเจ้าขอยืนยันว่าทรัพย์สินข้างต้นเป็นของข้าพเจ้าโดยชอบด้วยกฎหมาย ไม่ได้มาจากการกระทำผิด และยินยอมขายให้ร้านในราคาข้างต้น ยินยอมให้ร้านนำไปหลอม/ฝนเปิดผิว/วัดเปอร์เซ็นต์ และยินยอมให้ร้านเก็บสำเนาข้อมูลบัตรประชาชนตามที่กฎหมายกำหนด' }
   };
   const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || null; } catch (e) { return null; } };
@@ -72,7 +73,7 @@
     },
     logout: ({ p_token }) => { const a = auth(p_token); db.sessions.find(x => x.token === p_token).revoked_at = new Date().toISOString(); log(a.s, a.dev, 'logout'); return null; },
     get_settings: ({ p_token }) => { auth(p_token); return { settings: db.settings, server_time: new Date().toISOString() }; },
-    save_setting: ({ p_token, p_key, p_value }) => { const a = owner(p_token); if (!['shop', 'prices', 'receipt'].includes(p_key)) err('BAD_KEY'); db.settings[p_key] = p_value; log(a.s, a.dev, 'save_setting', { key: p_key }); return null; },
+    save_setting: ({ p_token, p_key, p_value }) => { const a = owner(p_token); if (!['shop', 'prices', 'receipt', 'cancel'].includes(p_key)) err('BAD_KEY'); db.settings[p_key] = p_value; log(a.s, a.dev, 'save_setting', { key: p_key }); return null; },
     create_bill: ({ p_token, p_bill }) => {
       const a = auth(p_token);
       const ex = db.bills.find(b => b.id === p_bill.id); if (ex) return { id: ex.id, bill_no: ex.bill_no, duplicate: true };
@@ -97,7 +98,25 @@
         .map(c => { const x = { ...c }; delete x.photo; return x; }).slice(0, 20);
     },
     get_customer: ({ p_token, p_id }) => { auth(p_token); const c = db.customers[p_id]; if (!c) return null; return { customer: c, bills: db.bills.filter(b => b.customer_id === p_id).map(b => ({ bill_no: b.bill_no, total: b.total, created_at: b.created_at, status: b.status })).reverse() }; },
-    void_bill: ({ p_token, p_id, p_reason }) => { const a = owner(p_token); const b = db.bills.find(x => x.id === p_id && x.status === 'ok'); if (!b) err('NOT_FOUND'); b.status = 'void'; b.void_reason = p_reason; b.voided_at = new Date().toISOString(); log(a.s, a.dev, 'void_bill', { bill_no: b.bill_no, reason: p_reason }); return null; },
+    void_bill: ({ p_token, p_id, p_reason, p_approver_code, p_approver_pin }) => {
+      const a = auth(p_token);
+      if (!(p_reason || '').trim()) return { error: 'REASON_REQUIRED' };
+      const b = db.bills.find(x => x.id === p_id && x.status === 'ok'); if (!b) return { error: 'NOT_FOUND' };
+      let appr = null;
+      if (a.s.role !== 'owner') {
+        const c = db.settings.cancel || {};
+        if (!c.enabled) return { error: 'STAFF_CANCEL_OFF' };
+        if (c.today_only !== false && bkkDate(b.created_at) !== bkkDate(new Date().toISOString())) return { error: 'BILL_NOT_TODAY' };
+        if (Number(b.total) > Number(c.limit || 0)) {
+          if (!p_approver_code) return { error: 'NEED_OWNER', limit: c.limit };
+          const r = pinCheck(p_approver_code, p_approver_pin); if (r !== 'OK') return { error: r };
+          appr = db.staff.find(x => x.code === p_approver_code.toUpperCase()); if (appr.role !== 'owner') return { error: 'OWNER_ONLY' };
+        }
+      }
+      b.status = 'void'; b.void_reason = p_reason; b.voided_at = new Date().toISOString(); b.voided_by_code = a.s.code; b.approved_by_code = appr && appr.code;
+      log(a.s, a.dev, 'void_bill', { bill_no: b.bill_no, total: b.total, reason: p_reason, approved_by: appr && appr.code });
+      return { ok: true, bill_no: b.bill_no, approved_by: appr && appr.code };
+    },
     list_staff: ({ p_token }) => { owner(p_token); return db.staff.map(s => ({ ...pub(s), active: s.active, locked: s.locked_until && new Date(s.locked_until) > new Date(), last_login: (db.sessions.filter(x => x.staff_id === s.id).map(x => x.created_at).sort().pop()) || null })); },
     add_staff: ({ p_token, p_nickname, p_role }) => {
       const a = owner(p_token); const pre = p_role === 'owner' ? 'OWN' : 'DD';
