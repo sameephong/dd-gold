@@ -206,7 +206,7 @@
     },
     list_sellable: ({ p_token }) => {
       auth(p_token); ensureItemIds(); const items = [];
-      db.bills.filter(b => b.status === 'ok' && !db.cancel_requests.some(r => r.bill_id === b.id && r.status === 'pending')).forEach(b => b.items.filter(i => i.stock_status === 'in_stock' && i.destination === 'whole').forEach(i => items.push({ id: i.item_id, metal: i.metal, item_kind: i.kind, pct: i.pct, weight: i.weight, amount: i.amount, bill_no: b.bill_no, created_at: b.created_at })));
+      db.bills.filter(b => b.status === 'ok' && !db.cancel_requests.some(r => r.bill_id === b.id && r.status === 'pending')).forEach(b => b.items.filter(i => i.stock_status === 'in_stock').forEach(i => items.push({ id: i.item_id, metal: i.metal, item_kind: i.kind, pct: i.pct, weight: i.weight, amount: i.amount, destination: i.destination, pre_weight: i.pre_weight, bill_no: b.bill_no, created_at: b.created_at, customer_name: (b.customer || {}).name })));
       const seen = new Set(); const buyers = db.sales.filter(x => x.status !== 'cancelled').filter(x => !seen.has(x.buyer_name) && seen.add(x.buyer_name)).map(x => ({ name: x.buyer_name, phone: x.buyer_phone, type: x.buyer_type }));
       return { melts: db.melts.filter(m => m.status === 'ready'), items, buyers };
     },

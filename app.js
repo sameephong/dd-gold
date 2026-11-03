@@ -4,7 +4,7 @@
 'use strict';
 const CFG = window.DD_CONFIG || {};
 const DEMO = !CFG.SUPABASE_URL;
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.7.1';
 
 // ---------------------------------------------------------------- utils
 const $ = (s, el = document) => el.querySelector(s);
@@ -1135,12 +1135,14 @@ function sellFormHtml() {
       <div class="seg"><button data-btype="shop" class="${d.buyer_type === 'shop' ? 'on' : ''}">🏪 ร้านรับซื้อทอง</button><button data-btype="refinery" class="${d.buyer_type === 'refinery' ? 'on' : ''}">🏭 โรงหลอม/สกัด</button></div>
       <div class="grid2"><label>ชื่อผู้ซื้อ *<input id="sbName" list="buyerList" value="${esc(d.buyer_name)}" placeholder="เช่น ร้านทองเยาวราช"></label><label>เบอร์โทร<input id="sbPhone" inputmode="tel" value="${esc(d.buyer_phone)}"></label></div>
       <datalist id="buyerList">${data.buyers.map(b => `<option value="${esc(b.name)}">`).join('')}</datalist></div>
-    <div class="card"><div class="card-h"><h2>เลือกของที่ขาย</h2><span class="muted sm">${data.melts.length} ก้อน · ${data.items.length} ชิ้น</span></div>
+    <div class="card"><div class="card-h"><h2>เลือกของที่ขาย</h2><span class="muted sm">${data.melts.length} ก้อน · ${data.items.length} รายการรับซื้อ</span></div>
       ${data.melts.length ? '<div class="lbl">ก้อนหลอมแล้ว</div>' : ''}
       ${data.melts.map(m => row('melt:' + m.id, `${esc(m.lot_no)} · ${esc(M[m.metal] ? M[m.metal].label : m.metal)}`, `เนื้อ ${gram(m.out_fine)} ก. · ${m.within_tolerance ? 'ในเกณฑ์' : '⚠ เกินเกณฑ์'}`, m.out_weight, m.measured_pct, num(m.items_cost) + num(m.melt_cost))).join('')}
-      ${data.items.length ? '<div class="lbl">ขายทั้งชิ้น</div>' : ''}
-      ${data.items.map(i => row('item:' + i.id, `${esc(M[i.metal] ? M[i.metal].label : i.metal)} ${esc(i.pct)}% · ${esc(i.item_kind || '')}`, `${esc(i.bill_no)} · ${thDateTime(i.created_at)}`, i.weight, i.pct, i.amount)).join('')}
-      ${!data.melts.length && !data.items.length ? '<p class="muted center-t">ยังไม่มีของพร้อมขาย — หลอมก้อนที่หน้า สต๊อก/หลอม ก่อน</p>' : ''}</div>
+      ${[['whole', 'ขายทั้งชิ้น'], ['lump', 'ก้อนย่อย (หลอมตอนรับซื้อ) — ยังไม่ได้รวมก้อน'], ['melt', 'รับซื้อมา ยังไม่หลอม']].map(([dst, title]) => {
+        const arr = data.items.filter(i => (i.destination || 'melt') === dst); if (!arr.length) return '';
+        return `<div class="lbl">${title} (${arr.length})</div>` + arr.map(i => row('item:' + i.id, `${esc(M[i.metal] ? M[i.metal].label : i.metal)} ${esc(i.pct)}% · ${esc(i.item_kind || '')}`, `${esc(i.bill_no)} · ${thDateTime(i.created_at)}${i.customer_name ? ' · ' + esc(i.customer_name) : ''}${i.pre_weight ? ` · ก่อนหลอม ${gram(i.pre_weight)} ก.` : ''}`, i.weight, i.pct, i.amount)).join('');
+      }).join('')}
+      ${!data.melts.length && !data.items.length ? '<p class="muted center-t">ยังไม่มีของในสต๊อก</p>' : ''}</div>
     <div class="card"><h2>ค่าใช้จ่าย & การรับเงิน</h2>
       <div class="grid2"><label>ค่าขนส่ง (บาท)<input id="sTrans" inputmode="decimal" value="${esc(d.transport_cost)}" placeholder="0"></label><label>ค่าใช้จ่ายอื่น (บาท)<input id="sOther" inputmode="decimal" value="${esc(d.other_cost)}" placeholder="0"></label></div>
       <div class="seg"><button data-paid="1" class="${d.paid ? 'on' : ''}">ได้รับเงินแล้ว</button><button data-paid="0" class="${!d.paid ? 'on' : ''}">รอรับเงิน</button></div>
