@@ -4,7 +4,7 @@
 'use strict';
 const CFG = window.DD_CONFIG || {};
 const DEMO = !CFG.SUPABASE_URL;
-const APP_VERSION = '1.9.0';
+const APP_VERSION = '1.9.1';
 
 // ---------------------------------------------------------------- utils
 const $ = (s, el = document) => el.querySelector(s);
@@ -935,7 +935,7 @@ async function pollPending() {
       S.pendingReq = n; updateTitle();
       if (n > before && lastPendingSeen !== null) {
         toast(`มีคำขอยกเลิกบิลใหม่ (${n} รายการรออนุมัติ)`, 'warn');
-        try { if ('Notification' in window && Notification.permission === 'granted') { const nt = new Notification('DD หลอมทอง: มีคำขอยกเลิกบิล', { body: `รออนุมัติ ${n} รายการ`, icon: 'icon-192.png', tag: 'dd-cancel' }); nt.onclick = () => { window.focus(); go('requests'); }; } } catch (e) { /* ignore */ }
+        try { if ('Notification' in window && Notification.permission === 'granted') { const nt = new Notification('DD หลอมทอง: มีคำขอยกเลิกบิล', { body: `รออนุมัติ ${n} รายการ`, icon: 'dd-icon-v2-192.png', tag: 'dd-cancel' }); nt.onclick = () => { window.focus(); go('requests'); }; } } catch (e) { /* ignore */ }
       }
       lastPendingSeen = n;
       if (n !== before && ['bills', 'more'].includes(S.screen) && !$('#modal')) { const sc = window.scrollY; go(S.screen); window.scrollTo(0, sc); }
