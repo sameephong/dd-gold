@@ -266,3 +266,23 @@ h2{font-size:18px}
 .linkish{border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left}
 .linkish:hover b{text-decoration:underline}
 .wait-row{cursor:pointer}
+
+/* สรุปรายเดือน */
+.mode{display:inline-flex;background:#EFEBE3;border-radius:10px;padding:3px;gap:3px}
+.mode button{height:34px;padding:0 14px;border:0;border-radius:8px;background:none;font-weight:600;color:var(--muted)}
+.mode button.on{background:#fff;color:var(--ink);box-shadow:var(--shadow)}
+.mon{display:inline-flex;align-items:center;gap:6px} .mon b{font-size:18px;min-width:110px;text-align:center}
+.legend{display:flex;gap:14px;font-size:13px;color:var(--muted)} .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.mtbl{width:100%;border-collapse:collapse;font-size:14px} .mtbl th{text-align:right;font-size:12px;color:var(--muted);font-weight:600;padding:6px 6px;border-bottom:1px solid var(--line)} .mtbl th:first-child{text-align:left}
+.mtbl td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap} .mtbl td:first-child{text-align:left} .mtbl tr.closed td{color:#B8AE98} .mtbl tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
+.mtbl tbody tr:hover{background:#FFFBEF;cursor:pointer}
+.scroll{max-height:420px;overflow:auto}
+.two>*{min-width:0}
+@media (max-width:480px){ .mtbl{font-size:12.5px} .mtbl td,.mtbl th{padding:6px 3px} }
+.pb{grid-template-columns:92px 1fr 110px}
+.three{display:grid;grid-template-columns:1fr;gap:14px}
+@media (min-width:900px){ .three{grid-template-columns:1fr 1fr 1fr} }
+
+.two>*{min-width:0}
+@media (max-width:480px){ .mtbl{font-size:12.5px} .mtbl td,.mtbl th{padding:6px 3px} }
+svg .bar{cursor:pointer} svg .bar:hover rect:first-child{fill:#FFFBEF}

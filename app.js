@@ -4,7 +4,7 @@
 'use strict';
 const CFG = window.DD_CONFIG || {};
 const DEMO = !CFG.SUPABASE_URL;
-const APP_VERSION = '1.8.0';
+const APP_VERSION = '1.9.0';
 
 // ---------------------------------------------------------------- utils
 const $ = (s, el = document) => el.querySelector(s);
@@ -1424,6 +1424,7 @@ const dayDiff = (d) => Math.round((new Date(bkkDate() + 'T00:00:00') - new Date(
 const shortTh = (d) => new Date(d + 'T00:00:00').toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
 async function renderBills() {
   if (DEMO || !S.online || !S.session.token) return renderBillsLegacy();
+  if (S.sumMode === 'month') return renderMonth();
   shell('สรุปวันนี้', '<div class="center"><span class="spin big"></span></div>');
   let d, bills;
   try { [d, bills] = await Promise.all([api('day_summary', { p_token: S.session.token, p_date: S.billsDate }), api('list_bills', { p_token: S.session.token, p_from: S.billsDate, p_to: S.billsDate })]); }
@@ -1483,7 +1484,7 @@ async function renderBills() {
   const notesHtml = (id) => (notesBy[id] || []).map(n => `<div class="note"><b>📝 ${esc(n.staff_code)}-${esc(n.nickname || '')} · ${thTime(n.created_at)}</b> — ${esc(n.note)}</div>`).join('');
   const waitList = (waitFilter === 'shop' ? pendShop : waitFilter === 'ref' ? pendRef : pend);
   $('.main').innerHTML = `${isOwner() && S.pendingReq ? `<div class="banner warn">⚠️ มีคำขอยกเลิกบิลรออนุมัติ ${S.pendingReq} รายการ <button class="btn sm" id="goReq">ดู / อนุมัติ</button></div>` : ''}
-  <h1 class="screen-title">สรุป <input type="date" id="bdate" value="${S.billsDate}" max="${bkkDate()}"> <span class="muted sm" style="font-weight:400">อัปเดตล่าสุด ${thTime(d.server_time)}</span> <button class="btn ghost sm" id="sumRefresh">รีเฟรช</button></h1>
+  <h1 class="screen-title">สรุป ${modeToggle()} <input type="date" id="bdate" value="${S.billsDate}" max="${bkkDate()}"> <span class="muted sm" style="font-weight:400">อัปเดตล่าสุด ${thTime(d.server_time)}</span> <button class="btn ghost sm" id="sumRefresh">รีเฟรช</button></h1>
   ${local.length ? `<div class="banner warn">มีบิลในเครื่องนี้ยังไม่ส่งขึ้นระบบ ${local.length} บิล — ยังไม่รวมในตัวเลขด้านล่าง <button class="btn sm" id="syncBtn">ส่งเลย</button></div>` : ''}
   <div class="flow">
     <div class="kpi in"><span>💰 เงินเข้า${S.billsDate === bkkDate() ? 'วันนี้' : ''}</span><b>+${money(inTotal)}</b><small>ขาย/รับเงิน ${inN} รายการ</small></div>
@@ -1525,6 +1526,7 @@ async function renderBills() {
   </div>`;
   $('#bdate').onchange = (e) => { S.billsDate = e.target.value || bkkDate(); renderBills(); };
   $('#sumRefresh').onclick = () => renderBills();
+  bindModeToggle();
   const gr = $('#goReq'); if (gr) gr.onclick = () => go('requests');
   const sb = $('#syncBtn'); if (sb) sb.onclick = () => { if (!S.session.token) reLoginModal(); else syncNow(); };
   $$('[data-wf]').forEach(b => b.onclick = () => { waitFilter = b.dataset.wf; renderBills(); });
@@ -1558,6 +1560,118 @@ function noteModal(refType, refId, title) {
     try { await api('add_note', { p_token: S.session.token, p_ref_type: refType, p_ref_id: refId, p_note: txt, p_code: $('#nCode').value, p_pin: $('#nPin').value }); toast('บันทึกหมายเหตุแล้ว'); closeModal(); renderBills(); }
     catch (e) { busy(ev.target, false); toast(errText(e), 'err'); $('#nPin').value = ''; }
   };
+}
+
+// ---------------------------------------------------------------- สรุปรายเดือน
+const TH_MON = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+const monLabel = (ym) => { const [y, m] = ym.split('-').map(Number); return `${TH_MON[m - 1]} ${y + 543}`; };
+const shiftMon = (ym, k) => { let [y, m] = ym.split('-').map(Number); m += k; while (m < 1) { m += 12; y--; } while (m > 12) { m -= 12; y++; } return `${y}-${String(m).padStart(2, '0')}`; };
+function modeToggle() { return `<span class="mode"><button data-mode="day" class="${S.sumMode !== 'month' ? 'on' : ''}">รายวัน</button><button data-mode="month" class="${S.sumMode === 'month' ? 'on' : ''}">รายเดือน</button></span>`; }
+function bindModeToggle() { $$('[data-mode]').forEach(b => b.onclick = () => { S.sumMode = b.dataset.mode; renderBills(); }); }
+let monthCache = null;
+async function renderMonth() {
+  S.sumMonth = S.sumMonth || bkkDate().slice(0, 7);
+  shell('สรุป', '<div class="center"><span class="spin big"></span></div>');
+  let d;
+  try { d = await api('month_summary', { p_token: S.session.token, p_month: S.sumMonth + '-01' }); }
+  catch (e) { toast(errText(e), 'err'); S.sumMode = 'day'; return renderBills(); }
+  if (S.screen !== 'bills') return;
+  monthCache = d;
+  const M = metals(), today = bkkDate(), mon = S.sumMonth;
+  const days = d.days.map(x => ({ ...x, out: num(x.buy) + num(x.expense), inc: num(x.income), closed: !num(x.bills) && !num(x.income) && !num(x.expense) }));
+  const totOut = days.reduce((t, x) => t + x.out, 0), totIn = days.reduce((t, x) => t + x.inc, 0), totExp = days.reduce((t, x) => t + num(x.expense), 0);
+  const bills = days.reduce((t, x) => t + num(x.bills), 0), incN = d.sales.reduce((t, s) => t + num(s.n), 0);
+  const profit = num(d.cur.profit), saleAmt = d.sales.reduce((t, s) => t + num(s.amount), 0);
+  const pend = d.pending, pendTot = num(pend.shop) + num(pend.refinery);
+  // กราฟ
+  const W = 1180, H = 220, pad = 34, n = days.length, bw = (W - pad * 2) / n, maxv = Math.max(1, ...days.map(x => Math.max(x.out, x.inc)));
+  const grid = [1, 2, 3, 4].map(k => { const y = H - 30 - (H - 50) * k / 4; return `<line x1="${pad}" x2="${W - pad}" y1="${y}" y2="${y}" stroke="#EFEBE3"/><text x="${pad - 4}" y="${y + 3}" font-size="10" text-anchor="end" fill="#8C8578">${Math.round(maxv * k / 4 / 1000)}k</text>`; }).join('');
+  const bars = days.map((x, i) => { const bx = pad + i * bw, dn = +x.date.slice(8), future = x.date > today;
+    let g = `<g class="bar" data-day="${x.date}"><rect x="${bx}" y="10" width="${bw}" height="${H - 20}" fill="transparent"/>`;
+    if (x.closed && !future) g += `<text x="${bx + bw / 2}" y="${H - 34}" font-size="9" text-anchor="middle" fill="#B8AE98">ปิด</text>`;
+    const ho = x.out / maxv * (H - 50), hi = x.inc / maxv * (H - 50);
+    if (ho) g += `<rect x="${bx + 2}" y="${H - 30 - ho}" width="${Math.max(1, bw / 2 - 3)}" height="${ho}" rx="2" fill="#E08A80"><title>${dn} ${monLabel(mon)} · เงินออก ${money(x.out)}</title></rect>`;
+    if (hi) g += `<rect x="${bx + bw / 2}" y="${H - 30 - hi}" width="${Math.max(1, bw / 2 - 3)}" height="${hi}" rx="2" fill="#4FA373"><title>${dn} ${monLabel(mon)} · เงินเข้า ${money(x.inc)}</title></rect>`;
+    if (dn % 5 === 1 || i === n - 1) g += `<text x="${bx + bw / 2}" y="${H - 14}" font-size="11" text-anchor="middle" fill="#6B6458">${dn}</text>`;
+    return g + '</g>'; }).join('');
+  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="กราฟเงินเข้าเงินออกรายวัน">${grid}${bars}</svg>`;
+  // แยก %
+  const pctRows = d.pct.filter(p => num(p.weight)), pmax = Math.max(1, ...pctRows.map(p => num(p.weight)));
+  const wByMetal = {}; pctRows.forEach(p => { wByMetal[p.metal] = (wByMetal[p.metal] || 0) + num(p.weight); });
+  const shop = d.sales.find(s => s.buyer_type !== 'refinery') || {}, refi = d.sales.find(s => s.buyer_type === 'refinery') || {};
+  const cmp = (cur, prev) => { cur = num(cur); prev = num(prev); if (!prev) return cur ? '<span class="muted">ใหม่</span>' : '<span class="muted">–</span>'; const p = (cur - prev) / Math.abs(prev) * 100; return `<span class="${p >= 0 ? 'okc' : 'bad'}">${p >= 0 ? '▲' : '▼'} ${Math.abs(p).toFixed(0)}%</span>`; };
+  const prevLabel = monLabel(shiftMon(mon, -1));
+  $('.main').innerHTML = `<h1 class="screen-title">สรุป ${modeToggle()}
+    <span class="mon"><button class="btn ghost sm" id="mPrev" aria-label="เดือนก่อน">‹</button><b>${monLabel(mon)}</b><button class="btn ghost sm" id="mNext" aria-label="เดือนถัดไป" ${mon >= today.slice(0, 7) ? 'disabled' : ''}>›</button></span>
+    <button class="btn ghost sm" id="mXls">⬇ ดาวน์โหลด Excel</button></h1>
+  <div class="flow">
+    <div class="kpi in"><span>💰 เงินเข้าทั้งเดือน</span><b>+${money(totIn)}</b><small>ขาย/รับเงิน ${incN} รายการ</small></div>
+    <div class="kpi out"><span>💸 เงินออกทั้งเดือน</span><b>−${money(totOut)}</b><small>รับซื้อ ${bills} บิล + ค่าใช้จ่าย ${money(totExp)}</small></div>
+    <div class="kpi"><span>สุทธิ (กระแสเงินสด)</span><b class="${totIn - totOut >= 0 ? 'okc' : 'bad'}">${totIn - totOut >= 0 ? '+' : '−'}${money(Math.abs(totIn - totOut))}</b><small>${totIn - totOut < 0 ? 'ส่วนใหญ่ไปอยู่ในสต๊อก' : 'เงินเข้ามากกว่าออก'}</small></div>
+    <div class="kpi"><span>📈 กำไรจากการขาย</span><b class="${profit >= 0 ? 'okc' : 'bad'}">${profit >= 0 ? '+' : '−'}${money(Math.abs(profit))}</b><small>ยอดขาย − ทุน − ค่าใช้จ่าย${saleAmt ? ` · ${(profit / saleAmt * 100).toFixed(1)}%` : ''}</small></div>
+    <div class="kpi cash"><span>สต๊อกคงเหลือ (ราคาทุน)</span><b>${money(d.stock.cost)}</b><small>ณ ตอนนี้ · ทอง ${gram(d.stock.gold_g)} ก. · เงิน ${gram(d.stock.silver_g)} ก.</small></div>
+  </div>
+  <div class="card"><div class="card-h"><h2>เงินเข้า / เงินออก รายวัน</h2><div class="legend"><span><i style="background:#E08A80"></i>เงินออก</span><span><i style="background:#4FA373"></i>เงินเข้า</span></div></div>
+    ${svg}<p class="muted sm">กดแท่งของวันไหน เพื่อเปิดสรุปของวันนั้น</p></div>
+  <div class="two">
+    <div class="card"><div class="card-h"><h2>รายวัน</h2><span class="muted sm">กดแถวเพื่อดูวันนั้น</span></div>
+      <div class="scroll"><table class="mtbl"><thead><tr><th>วัน</th><th>บิล</th><th>รับซื้อ</th><th>ขาย/รับเงิน</th><th>สุทธิ</th><th></th></tr></thead><tbody>
+      ${days.filter(x => x.date <= today).map(x => { const dn = +x.date.slice(8), net = x.inc - x.out;
+        return x.closed ? `<tr class="closed" data-day="${x.date}"><td>${dn} ${TH_MON[+mon.slice(5) - 1]}</td><td colspan="4">ไม่มีรายการ</td><td>›</td></tr>`
+          : `<tr data-day="${x.date}"><td>${dn} ${TH_MON[+mon.slice(5) - 1]}</td><td>${x.bills}</td><td class="out-t">${money(x.out)}</td><td class="in-t">${x.inc ? money(x.inc) : '–'}</td><td class="${net >= 0 ? 'in-t' : 'out-t'}">${net >= 0 ? '+' : '−'}${money(Math.abs(net))}</td><td>›</td></tr>`; }).join('')}
+      </tbody><tfoot><tr><td>รวม</td><td>${bills}</td><td class="out-t">${money(totOut)}</td><td class="in-t">${money(totIn)}</td><td class="${totIn - totOut >= 0 ? 'in-t' : 'out-t'}">${totIn - totOut >= 0 ? '+' : '−'}${money(Math.abs(totIn - totOut))}</td><td></td></tr></tfoot></table></div></div>
+    <div>
+      <div class="card"><div class="card-h"><h2>รับซื้อแยกตาม %</h2><span class="muted sm">${Object.entries(wByMetal).map(([k, w]) => `${esc(M[k] ? M[k].label : k)} ${gram(w)} ก.`).join(' · ') || '-'}</span></div>
+        <div class="pct-bars">${pctRows.map(p => `<div class="pb"><span>${esc(M[p.metal] ? M[p.metal].label : p.metal)} ${num(p.pct)}%</span><div><i style="width:${(num(p.weight) / pmax * 100).toFixed(1)}%;${p.metal === 'silver' ? 'background:#9AA5B1' : ''}"></i></div><b>${gram(p.weight)} ก.</b></div>`).join('') || '<p class="muted">ยังไม่มีการรับซื้อ</p>'}</div></div>
+      <div class="card"><div class="card-h"><h2>การขายในเดือน</h2><span class="muted sm">${incN} รายการ</span></div>
+        <table class="brk">
+          <tr><td>🏪 ร้านรับซื้อ <span class="sub">· ${num(shop.n)} รายการ · ${gram(shop.weight)} ก.</span></td><td class="in-t">${money(shop.amount)}</td></tr>
+          <tr><td><span class="sub">↳ กำไร</span></td><td><span class="sub ${num(shop.profit) >= 0 ? 'okc' : 'bad'}">${num(shop.profit) >= 0 ? '+' : '−'}${money(Math.abs(num(shop.profit)))}</span></td></tr>
+          <tr><td>🏭 โรงสกัด <span class="sub">· ${num(refi.n)} ล็อต · ${gram(refi.weight)} ก.</span></td><td class="in-t">${money(refi.amount)}</td></tr>
+          <tr><td><span class="sub">↳ กำไร${num(refi.fees) ? ` (หักค่าสกัด ${money(refi.fees)})` : ''}</span></td><td><span class="sub ${num(refi.profit) >= 0 ? 'okc' : 'bad'}">${num(refi.profit) >= 0 ? '+' : '−'}${money(Math.abs(num(refi.profit)))}</span></td></tr>
+          ${num(d.extra.silver_returned_g) ? `<tr><td><span class="sub">↳ แร่เงินรับคืนเข้าสต๊อก</span></td><td><span class="sub">${gram(d.extra.silver_returned_g)} ก.</span></td></tr>` : ''}
+          <tr class="tot"><td>รวมกำไรจากการขาย</td><td class="${profit >= 0 ? 'okc' : 'bad'}">${profit >= 0 ? '+' : '−'}${money(Math.abs(profit))}</td></tr>
+        </table></div>
+    </div>
+  </div>
+  <div class="three">
+    <div class="card"><div class="card-h"><h2>⏳ รอรับเงิน ณ สิ้นเดือน</h2></div>
+      <table class="brk"><tr><td>🏪 ร้านรับซื้อ <span class="sub">· ${pend.shop_n} รายการ</span></td><td>${money(pend.shop)}</td></tr><tr><td>🏭 โรงสกัด <span class="sub">· ${pend.refinery_n} รายการ</span></td><td>${money(pend.refinery)}</td></tr>
+      ${num(pend.overdue) ? `<tr><td><span class="sub bad">↳ เลยกำหนด</span></td><td><span class="sub bad">${money(pend.overdue)}</span></td></tr>` : ''}<tr class="tot"><td>รวม</td><td>${money(pendTot)}</td></tr></table></div>
+    <div class="card"><div class="card-h"><h2>👤 พนักงาน</h2><span class="muted sm">บิลรับซื้อ</span></div>
+      <table class="brk">${d.staff.map(s => `<tr><td>${esc(s.staff_code)}-${esc(s.nickname || '')} <span class="sub">· ${s.bills} บิล · ยกเลิก ${s.voided}</span></td><td>${money(s.total)}</td></tr>`).join('') || '<tr><td class="muted">ยังไม่มีบิล</td><td></td></tr>'}
+      <tr class="tot"><td>รวม ${bills} บิล</td><td>${money(d.cur.buy)}</td></tr></table></div>
+    <div class="card"><div class="card-h"><h2>📊 เทียบเดือนก่อน</h2><span class="muted sm">${prevLabel}</span></div>
+      <table class="brk"><tr><td>ยอดรับซื้อ</td><td>${cmp(d.cur.buy, d.prev.buy)}</td></tr><tr><td>จำนวนบิล</td><td>${cmp(d.cur.bills, d.prev.bills)}</td></tr><tr><td>กำไรจากการขาย</td><td>${cmp(d.cur.profit, d.prev.profit)}</td></tr>
+      <tr><td>ลูกค้าใหม่</td><td>${d.extra.new_customers} คน</td></tr><tr><td>% สูญเสียตอนหลอม (เฉลี่ย)</td><td>${d.extra.melt_loss_pct != null ? num(d.extra.melt_loss_pct).toFixed(2) + '%' : '–'}</td></tr></table></div>
+  </div>`;
+  bindModeToggle();
+  $('#mPrev').onclick = () => { S.sumMonth = shiftMon(mon, -1); renderMonth(); };
+  $('#mNext').onclick = () => { S.sumMonth = shiftMon(mon, 1); renderMonth(); };
+  $('#mXls').onclick = () => exportMonth(d);
+  $$('[data-day]').forEach(el => el.onclick = () => { if (el.dataset.day > today) return; S.billsDate = el.dataset.day; S.sumMode = 'day'; renderBills(); });
+}
+function exportMonth(d) {
+  const M = metals(), mon = S.sumMonth, q = (v) => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const L = [];
+  L.push([`สรุปรายเดือน ${monLabel(mon)}`, (S.settings.shop || {}).name || '', (S.settings.shop || {}).branch || ''].map(q).join(','));
+  L.push(''); L.push('วันที่,จำนวนบิล,รับซื้อ (บาท),รับซื้อเงินสด,ค่าใช้จ่าย,เงินออกรวม,เงินเข้า,สุทธิ');
+  let tb = 0, tbuy = 0, tc = 0, te = 0, ti = 0;
+  d.days.forEach(x => { const out = num(x.buy) + num(x.expense); tb += num(x.bills); tbuy += num(x.buy); tc += num(x.buy_cash); te += num(x.expense); ti += num(x.income);
+    L.push([dueTh(x.date), x.bills, num(x.buy), num(x.buy_cash), num(x.expense), out, num(x.income), num(x.income) - out].map(q).join(',')); });
+  L.push(['รวม', tb, tbuy, tc, te, tbuy + te, ti, ti - tbuy - te].map(q).join(','));
+  L.push(''); L.push('รับซื้อแยกตาม %'); L.push('โลหะ,%,น้ำหนัก (ก.),ยอดเงิน');
+  d.pct.forEach(p => L.push([M[p.metal] ? M[p.metal].label : p.metal, num(p.pct), num(p.weight), num(p.amount)].map(q).join(',')));
+  L.push(''); L.push('การขาย'); L.push('ประเภท,จำนวน,น้ำหนัก (ก.),ยอดขาย,กำไร,ค่าสกัด');
+  d.sales.forEach(s => L.push([s.buyer_type === 'refinery' ? 'โรงสกัด' : 'ร้านรับซื้อ', s.n, num(s.weight), num(s.amount), num(s.profit), num(s.fees)].map(q).join(',')));
+  L.push(''); L.push('พนักงาน'); L.push('รหัส,ชื่อ,บิล,ยอดรับซื้อ,ยกเลิก');
+  d.staff.forEach(s => L.push([s.staff_code, s.nickname, s.bills, num(s.total), s.voided].map(q).join(',')));
+  L.push(''); L.push(['รอรับเงิน ณ สิ้นเดือน', num(d.pending.shop) + num(d.pending.refinery)].map(q).join(','));
+  L.push(['สต๊อกคงเหลือ (ราคาทุน ณ วันที่ดาวน์โหลด)', num(d.stock.cost)].map(q).join(','));
+  const blob = new Blob(['﻿' + L.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `DD-summary-${+mon.slice(0, 4) + 543}-${mon.slice(5)}.csv`; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  toast('ดาวน์โหลดแล้ว เปิดด้วย Excel ได้เลย');
 }
 
 // ---------------------------------------------------------------- customers
