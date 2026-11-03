@@ -4,7 +4,7 @@
 'use strict';
 const CFG = window.DD_CONFIG || {};
 const DEMO = !CFG.SUPABASE_URL;
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.7.0';
 
 // ---------------------------------------------------------------- utils
 const $ = (s, el = document) => el.querySelector(s);
@@ -24,6 +24,7 @@ const bkkDate = (d = now()) => new Date(d).toLocaleDateString('en-CA', { timeZon
 const thDateTime = (d) => new Date(d).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 const thTime = (d) => new Date(d).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' });
 const thDateLong = (d) => new Date(d).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+const dueTh = (d) => { const p = String(d || '').split('-'); return p.length === 3 ? `${+p[2]}/${+p[1]}/${+p[0] + 543}` : d; };
 const maskId = (id) => id && id.length === 13 ? `${id[0]}-${id.slice(1, 5)}-xxxxx-${id.slice(10, 12)}-${id[12]}` : (id || '');
 const fmtId = (id) => id && id.length === 13 ? `${id[0]}-${id.slice(1, 5)}-${id.slice(5, 10)}-${id.slice(10, 12)}-${id[12]}` : (id || '');
 
@@ -39,7 +40,7 @@ const ERR = {
   PIN_WRONG: 'PIN ไม่ถูกต้อง', DEVICE_INVALID: 'เครื่องนี้ยังไม่ได้ลงทะเบียน หรือถูกยกเลิกแล้ว', SESSION_INVALID: 'หมดเวลาเข้าระบบ กรุณาเข้าระบบใหม่',
   OWNER_ONLY: 'เฉพาะเจ้าของเท่านั้น', PIN_WEAK: 'PIN ง่ายเกินไป เลือกตัวเลขอื่น', PIN_FORMAT: 'PIN ต้องเป็นตัวเลข 4 หลัก (เจ้าของ 6 หลัก)', PIN_FORMAT_6: 'PIN เจ้าของต้องเป็นตัวเลข 6 หลัก',
   ALREADY_SETUP: 'ร้านนี้ตั้งค่าเจ้าของไปแล้ว', CUSTOMER_REQUIRED: 'ต้องมีเลขบัตรประชาชนผู้ขาย', WRONG_BRANCH: 'พนักงานไม่ได้อยู่สาขานี้', CANNOT_SELF: 'ปิดบัญชีตัวเองไม่ได้',
-  NOT_FOUND: 'ไม่พบบิล หรือบิลถูกยกเลิกไปแล้ว', REASON_REQUIRED: 'ต้องใส่เหตุผลที่ยกเลิก', STAFF_CANCEL_OFF: 'เจ้าของปิดฟังก์ชันให้พนักงานยกเลิกบิลไว้', BILL_NOT_TODAY: 'พนักงานยกเลิกได้เฉพาะบิลของวันนี้', NEED_OWNER: 'บิลนี้เกินวงเงิน ต้องให้เจ้าของอนุมัติ', REQUEST_DONE: 'คำขอนี้ถูกตัดสินไปแล้ว', NET: 'ไม่มีอินเทอร์เน็ต', OFFLINE_LOGIN: 'เครื่องนี้ยังไม่เคยเข้าระบบด้วยรหัสนี้ตอนออนไลน์ จึงเข้าแบบออฟไลน์ไม่ได้'
+  NOT_FOUND: 'ไม่พบบิล หรือบิลถูกยกเลิกไปแล้ว', REASON_REQUIRED: 'ต้องใส่เหตุผลที่ยกเลิก', STAFF_CANCEL_OFF: 'เจ้าของปิดฟังก์ชันให้พนักงานยกเลิกบิลไว้', BILL_NOT_TODAY: 'พนักงานยกเลิกได้เฉพาะบิลของวันนี้', NEED_OWNER: 'บิลนี้เกินวงเงิน ต้องให้เจ้าของอนุมัติ', REQUEST_DONE: 'คำขอนี้ถูกตัดสินไปแล้ว', ITEMS_USED: 'ของในบิลนี้ถูกนำไปหลอม/ขายแล้ว ยกเลิกบิลไม่ได้ (ยกเลิกการหลอมก่อน)', ITEMS_CHANGED: 'รายการที่เลือกมีการเปลี่ยนแปลง กรุณาโหลดใหม่', MIXED_METAL: 'หลอมรวมได้เฉพาะโลหะชนิดเดียวกัน', OUT_HEAVIER: 'น้ำหนักหลังหลอมมากกว่าก่อนหลอม — ตรวจตัวเลขอีกครั้ง', BAD_WEIGHT: 'ใส่น้ำหนักหลังหลอม', BAD_PCT: 'ใส่ % ที่วัดได้ (0-100)', MELT_LOCKED: 'ก้อนนี้ถูกขาย/ยกเลิกไปแล้ว', SELL_NOT_ALLOWED: 'ไม่มีสิทธิ์บันทึกการขาย (เจ้าของเปิดได้ที่ ตั้งค่า → ขาย)', BUYER_REQUIRED: 'ใส่ชื่อผู้ซื้อ', NO_LINES: 'เลือกของที่ขาย', LINE_AMOUNT: 'ใส่ยอดขายให้ครบทุกรายการ', STOCK_CHANGED: 'ของบางรายการถูกขายหรือเปลี่ยนสถานะไปแล้ว กรุณาโหลดใหม่', SALE_LOCKED: 'รายการขายนี้ถูกปิดไปแล้ว', DOC_TOO_BIG: 'รูปใหญ่เกินไป', DOC_LIMIT: 'แนบได้สูงสุด 10 ไฟล์', MERGE_NEED_2: 'เลือกอย่างน้อย 2 ก้อนเพื่อรวม', LOT_LOCKED: 'ล็อตนี้ปิดไปแล้ว', SILVER_USED: 'แร่เงินที่รับคืนถูกขายไปแล้ว ยกเลิกไม่ได้', DEMO_ONLY_SUPABASE: 'ฟังก์ชันนี้ใช้ได้เมื่อเชื่อม Supabase แล้ว', NET: 'ไม่มีอินเทอร์เน็ต', OFFLINE_LOGIN: 'เครื่องนี้ยังไม่เคยเข้าระบบด้วยรหัสนี้ตอนออนไลน์ จึงเข้าแบบออฟไลน์ไม่ได้'
 };
 const errText = (e) => { const m = (e && e.message) || String(e); if (m.startsWith('LOCKED:')) return `ใส่ PIN ผิดหลายครั้ง ล็อกไว้ ${m.split(':')[1]} นาที`; return ERR[m] || m; };
 const isNet = (e) => e && (e.net || e.name === 'TypeError' || e.name === 'AbortError');
@@ -177,8 +178,9 @@ function renderStatus() {
 // ---------------------------------------------------------------- shell
 const NAV = [
   { id: 'buy', label: 'รับซื้อ', icon: 'M12 3v18M5 10l7-7 7 7' },
+  { id: 'stock', label: 'สต๊อก/หลอม', icon: 'M3 7l9-4 9 4-9 4-9-4zM3 12l9 4 9-4M3 17l9 4 9-4' },
   { id: 'bills', label: 'สรุปวันนี้', icon: 'M4 19V9M10 19V5M16 19v-7M22 19H2' },
-  { id: 'customers', label: 'ลูกค้า', icon: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' },
+  { id: 'sell', label: 'ขาย', icon: 'M12 21V3M5 14l7 7 7-7' },
   { id: 'more', label: 'เพิ่มเติม', icon: 'M4 6h16M4 12h16M4 18h16' }
 ];
 const icon = (d) => `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
@@ -186,7 +188,7 @@ const icon = (d) => `<svg viewBox="0 0 24 24" width="22" height="22" fill="none"
 function shell(title, body) {
   const shop = (S.settings && S.settings.shop) || {};
   const badge = (id) => id === 'more' && isOwner() && S.pendingReq ? `<i class="badge">${S.pendingReq}</i>` : '';
-  const tabs = NAV.map(n => `<button class="tab ${S.screen === n.id || (n.id === 'more' && ['more', 'settings', 'staff', 'audit', 'pin', 'requests'].includes(S.screen)) ? 'active' : ''}" data-go="${n.id}">${icon(n.icon)}<span>${n.label}</span>${badge(n.id)}</button>`).join('');
+  const tabs = NAV.map(n => `<button class="tab ${S.screen === n.id || (n.id === 'more' && ['more', 'settings', 'staff', 'audit', 'pin', 'requests', 'customers'].includes(S.screen)) ? 'active' : ''}" data-go="${n.id}">${icon(n.icon)}<span>${n.label}</span>${badge(n.id)}</button>`).join('');
   const reqBanner = isOwner() && S.pendingReq && S.screen !== 'requests' ? `<div class="banner warn">⚠️ มีคำขอยกเลิกบิลรออนุมัติ ${S.pendingReq} รายการ <button class="btn sm" data-go="requests">ดู / อนุมัติ</button></div>` : '';
   $('#app').innerHTML = `
   <header class="appbar">
@@ -207,7 +209,7 @@ function go(screen) {
   if (me().must_change_pin && screen !== 'pin') screen = 'pin';
   S.screen = screen;
   window.scrollTo(0, 0);
-  ({ buy: renderBuy, bills: renderBills, customers: renderCustomers, more: renderMore, settings: renderSettings, staff: renderStaff, audit: renderAudit, pin: renderPin, requests: renderRequests }[screen] || renderBuy)();
+  ({ buy: renderBuy, bills: renderBills, customers: renderCustomers, more: renderMore, settings: renderSettings, staff: renderStaff, audit: renderAudit, pin: renderPin, requests: renderRequests, stock: renderStock, sell: renderSell }[screen] || renderBuy)();
   // เจ้าของเข้าระบบวันแรกของวัน และยังไม่ได้ตั้งราคาวันนี้ → ถามว่าจะใช้ราคาแบบไหน
   if (isOwner() && S.session.token && screen !== 'pin' && S.settings && S.settings.prices && S.settings.prices.date !== bkkDate() && S.priceAsked !== bkkDate()) {
     S.priceAsked = bkkDate(); setTimeout(dailyPriceModal, 200);
@@ -476,10 +478,11 @@ function priceFor(metal, pct) {
 }
 function roundAmt(v) { const r = num(S.settings.prices.round) || 1; return Math.floor(v / r) * r; }
 
+const DEST_LABEL = { lump: 'หลอมแล้ว (ก้อนย่อย)', melt: 'ยังไม่หลอม', whole: 'ขายทั้งชิ้น' };
 // ---------------------------------------------------------------- BUY
 function newBuy() {
   const first = (metalEntries()[0] || ['gold'])[0];
-  return { id: uuid(), customer: null, items: [], cash: null, note: '', entry: { metal: first, kind: (metals()[first] || {}).kinds ? metals()[first].kinds[0] : '', pct: '', weight: '', price: '', amount: '', priceEdited: false, amountEdited: false, destination: 'melt' } };
+  return { id: uuid(), customer: null, items: [], cash: null, note: '', entry: { metal: first, kind: (metals()[first] || {}).kinds ? metals()[first].kinds[0] : '', pct: '', weight: '', price: '', amount: '', priceEdited: false, amountEdited: false, destination: 'lump', pre_weight: '' } };
 }
 const buyTotal = () => S.buy.items.reduce((s, i) => s + num(i.amount), 0);
 
@@ -530,10 +533,11 @@ function renderBuy() {
         <label>ราคา/กรัม<input id="price" inputmode="decimal" value="${esc(e.price)}" placeholder="0" class="${e.priceEdited ? 'edited' : ''}"></label>
         <label>เป็นเงิน<input id="amount" inputmode="decimal" value="${esc(e.amount)}" placeholder="0" class="${e.amountEdited ? 'edited' : ''}"></label>
       </div>
-      <div class="seg dest"><button data-dest="melt" class="${e.destination === 'melt' ? 'on' : ''}">นำไปหลอม</button><button data-dest="whole" class="${e.destination === 'whole' ? 'on' : ''}">ขายทั้งชิ้น</button></div>
+      <div class="seg dest">${['lump', 'melt', 'whole'].map(d => `<button data-dest="${d}" class="${e.destination === d ? 'on' : ''}">${DEST_LABEL[d]}</button>`).join('')}</div>
+      <div id="preWrap" style="${e.destination === 'lump' ? '' : 'display:none'}"><label>น้ำหนักก่อนหลอม (ก.) — ไม่บังคับ<input id="preW" inputmode="decimal" value="${esc(e.pre_weight || '')}" placeholder="ถ้าหลอมต่อหน้าลูกค้า ใส่น้ำหนักเดิมไว้ดูส่วนต่าง"></label></div>
       <button class="btn block" id="addItem">+ เพิ่มรายการ</button>
       <div class="items">${B.items.map((it, i) => `
-        <div class="item"><div><b>${esc(M[it.metal] ? M[it.metal].label : it.metal)} ${esc(it.pct)}%</b> · ${esc(it.kind)}<br><span class="muted sm">${gram(it.weight)} ก. × ${money(it.price_per_g)} · ${it.destination === 'melt' ? 'หลอม' : 'ขายทั้งชิ้น'}</span></div>
+        <div class="item"><div><b>${esc(M[it.metal] ? M[it.metal].label : it.metal)} ${esc(it.pct)}%</b> · ${esc(it.kind)}<br><span class="muted sm">${gram(it.weight)} ก. × ${money(it.price_per_g)} · ${DEST_LABEL[it.destination] || ''}${it.pre_weight ? ` (ก่อนหลอม ${gram(it.pre_weight)} ก.)` : ''}</span></div>
         <div class="right"><b>${money(it.amount)}</b><button class="x" data-del="${i}" aria-label="ลบ">✕</button></div></div>`).join('') || '<p class="muted center-t sm">ยังไม่มีรายการ</p>'}</div>
       <div class="sum"><span>รวม</span><b>${money(total)} บาท</b></div>
       <button class="btn block next-step" data-next="3" ${B.items.length ? '' : 'disabled'}>ถัดไป: จ่ายเงิน</button>
@@ -575,7 +579,8 @@ function bindBuy() {
 
   $$('[data-metal]').forEach(b => b.onclick = () => { e.metal = b.dataset.metal; e.kind = (metals()[e.metal].kinds || [''])[0]; e.pct = ''; e.priceEdited = false; e.amountEdited = false; e.price = ''; e.amount = ''; renderBuy(); });
   $$('[data-kind]').forEach(b => b.onclick = () => { e.kind = b.dataset.kind; $$('[data-kind]').forEach(x => x.classList.toggle('on', x === b)); });
-  $$('[data-dest]').forEach(b => b.onclick = () => { e.destination = b.dataset.dest; $$('[data-dest]').forEach(x => x.classList.toggle('on', x === b)); });
+  $$('[data-dest]').forEach(b => b.onclick = () => { e.destination = b.dataset.dest; $$('[data-dest]').forEach(x => x.classList.toggle('on', x === b)); $('#preWrap').style.display = e.destination === 'lump' ? '' : 'none'; });
+  $('#preW').oninput = (ev) => { e.pre_weight = ev.target.value; };
   $$('[data-pct]').forEach(b => b.onclick = () => { e.pct = b.dataset.pct; $('#pct').value = e.pct; $$('[data-pct]').forEach(x => x.classList.toggle('on', x === b)); e.priceEdited = false; recalc(); $('#weight').focus(); });
   $('#pct').oninput = (ev) => { e.pct = ev.target.value; $$('[data-pct]').forEach(x => x.classList.toggle('on', num(x.dataset.pct) === num(e.pct))); e.priceEdited = false; recalc(); };
   $('#weight').oninput = (ev) => { e.weight = ev.target.value; recalc(); };
@@ -602,8 +607,8 @@ function addItem() {
   if (!num(e.pct) || num(e.pct) > 100) return toast('ใส่เปอร์เซ็นต์ให้ถูกต้อง', 'err');
   if (!num(e.weight)) return toast('ใส่น้ำหนัก', 'err');
   if (!num(e.amount)) return toast('ยังไม่มีราคา — ใส่ราคา/กรัมเอง หรือให้เจ้าของตั้งราคา %', 'err');
-  S.buy.items.push({ metal: e.metal, kind: e.kind, pct: num(e.pct), weight: num(e.weight), price_per_g: num(e.price), amount: num(e.amount), destination: e.destination, price_edited: e.priceEdited || e.amountEdited });
-  Object.assign(e, { pct: '', weight: '', price: '', amount: '', priceEdited: false, amountEdited: false });
+  S.buy.items.push({ metal: e.metal, kind: e.kind, pct: num(e.pct), weight: num(e.weight), price_per_g: num(e.price), amount: num(e.amount), destination: e.destination, pre_weight: e.destination === 'lump' && num(e.pre_weight) ? num(e.pre_weight) : null, price_edited: e.priceEdited || e.amountEdited });
+  Object.assign(e, { pct: '', weight: '', price: '', amount: '', pre_weight: '', priceEdited: false, amountEdited: false });
   S.buy.cash = null; renderBuy();
 }
 
@@ -741,7 +746,7 @@ function receiptHtml(b, staff, copyLabel) {
     ${c.address ? `<div class="r-s">${esc(c.address)}</div>` : ''}
     <div class="r-hr"></div>
     ${b.items.map((it, i) => `<div class="r-it"><div>${i + 1}. ${esc(M[it.metal] ? M[it.metal].label : it.metal)} ${esc(it.pct)}% ${esc(it.kind || '')}</div>
-      <div class="r-row r-s"><span>${gram(it.weight)} ก. × ${money(it.price_per_g)}</span><b>${money(it.amount)}</b></div></div>`).join('')}
+      <div class="r-row r-s"><span>${gram(it.weight)} ก. × ${money(it.price_per_g)}</span><b>${money(it.amount)}</b></div>${it.pre_weight ? `<div class="r-s">หลอมแล้ว · ก่อนหลอม ${gram(it.pre_weight)} ก.</div>` : ''}</div>`).join('')}
     <div class="r-hr"></div>
     <div class="r-row r-b r-l"><span>รวมเงิน</span><span>${money(b.total)} บาท</span></div>
     <div class="r-row r-s"><span>น้ำหนักรวม</span><span>${gram(b.items.reduce((s, i) => s + num(i.weight), 0))} ก.</span></div>
@@ -946,6 +951,468 @@ async function pollPending() {
 setInterval(pollPending, 30000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) pollPending(); });
 
+// ---------------------------------------------------------------- เฟส 2.1: สต๊อก + หลอม
+function meltCfg() { return Object.assign({ default_cost: 500, tolerance_pct: 0.5, loss_warn_pct: 2 }, (S.settings && S.settings.melt) || {}); }
+const fine = (w, p) => num(w) * num(p) / 100;
+let stockTab = 'melt', stockMetal = 'gold', stockSel = new Set(), stockCache = [];
+async function renderStock() {
+  shell('สต๊อก / หลอม', '<div class="center"><span class="spin big"></span></div>');
+  if (!S.session.token || !S.online) { $('.main').innerHTML = '<h1 class="screen-title">สต๊อก / หลอม</h1><div class="banner warn">ต้องออนไลน์ (บิลที่ทำตอนออฟไลน์จะเข้าสต๊อกหลังส่งขึ้นระบบ)</div>'; return; }
+  const M = metals();
+  let items = [], melts = [];
+  try { [items, melts] = await Promise.all([api('list_stock', { p_token: S.session.token }), api('list_melts', { p_token: S.session.token, p_scope: stockTab === 'history' ? 'all' : 'stock' })]); }
+  catch (e) { toast(errText(e), 'err'); }
+  if (S.screen !== 'stock') return;
+  stockCache = items;
+  const valid = new Set(items.map(i => i.id)); stockSel.forEach(id => { if (!valid.has(id)) stockSel.delete(id); });
+  const meltItems = items.filter(i => i.destination !== 'whole'), wholeItems = items.filter(i => i.destination === 'whole');
+  const sum = (arr) => ({ n: arr.length, w: arr.reduce((t, i) => t + num(i.weight), 0), f: arr.reduce((t, i) => t + fine(i.weight, i.pct), 0), c: arr.reduce((t, i) => t + num(i.amount), 0) });
+  const metalTotals = metalEntries(M).map(([k, m]) => ({ k, label: m.label, s: sum(meltItems.filter(i => i.metal === k)) })).filter(x => x.s.n);
+  const readyByMetal = metalEntries(M).map(([k, m]) => ({ label: m.label, n: melts.filter(x => x.metal === k && x.status === 'ready').length, w: melts.filter(x => x.metal === k && x.status === 'ready').reduce((t, x) => t + num(x.out_fine), 0) })).filter(x => x.n);
+  const tabs = [['melt', `รอหลอม (${meltItems.length})`], ['ingots', `ก้อนหลอมแล้ว (${stockTab === 'history' ? '…' : melts.length})`], ['whole', `ขายทั้งชิ้น (${wholeItems.length})`], ['history', 'ประวัติหลอม']];
+  let body = `<div class="seg">${tabs.map(t => `<button data-stab="${t[0]}" class="${stockTab === t[0] ? 'on' : ''}">${t[1]}</button>`).join('')}</div>`;
+  if (stockTab === 'melt') {
+    const list = meltItems.filter(i => i.metal === stockMetal);
+    const sel = sum(list.filter(i => stockSel.has(i.id)));
+    body += `<div class="kpis">${metalTotals.map(x => `<div class="kpi"><span>${esc(x.label)} รอหลอม</span><b>${gram(x.s.w)} ก.</b><small>เนื้อ ${gram(x.s.f)} ก. · ทุน ${money(x.s.c)}</small></div>`).join('') || '<div class="kpi"><span>รอหลอม</span><b>0 ก.</b><small>&nbsp;</small></div>'}</div>
+      <div class="card"><div class="seg metal">${metalEntries(M).map(([k, m]) => `<button data-smetal="${k}" class="${stockMetal === k ? 'on' : ''}">${esc(m.label)}</button>`).join('')}</div>
+      <div class="row"><button class="btn ghost sm" id="selAll">เลือกทั้งหมด</button><button class="btn ghost sm" id="selNone">ล้างที่เลือก</button><span class="muted sm grow" style="text-align:right">${list.length} รายการ</span></div>
+      <div class="list">${list.map(i => `<label class="stock-row ${stockSel.has(i.id) ? 'on' : ''}"><input type="checkbox" data-sid="${i.id}" ${stockSel.has(i.id) ? 'checked' : ''}>
+        <div class="grow"><b>${esc(i.pct)}%</b> · ${esc(i.item_kind || '')} <span class="muted sm">· ${esc(i.bill_no)} · ${thDateTime(i.created_at)}</span><br><span class="sm muted">${esc(i.customer_name || '')}</span></div>
+        <div class="right"><b>${gram(i.weight)} ก.</b><br><span class="muted sm">${money(i.amount)}</span></div></label>`).join('') || '<p class="muted center-t">ไม่มีของรอหลอม</p>'}</div></div>
+      <div class="melt-bar ${sel.n ? 'show' : ''}"><div><b>เลือก ${sel.n} รายการ · ${gram(sel.w)} ก.</b><br><span class="sm">% เฉลี่ย ${sel.w ? (sel.f / sel.w * 100).toFixed(2) : '-'} · เนื้อที่คาด ${gram(sel.f)} ก. · ทุน ${money(sel.c)}</span></div><button class="btn gold" id="doMelt" ${sel.n ? '' : 'disabled'}>หลอมเป็นก้อน</button></div>`;
+  } else if (stockTab === 'ingots' || stockTab === 'history') {
+    const list = stockTab === 'history' ? melts : melts.filter(m => m.status === 'ready');
+    body += stockTab === 'ingots' ? `<div class="kpis">${readyByMetal.map(x => `<div class="kpi"><span>${esc(x.label)} ก้อนพร้อมขาย</span><b>${x.n} ก้อน</b><small>เนื้อรวม ${gram(x.w)} ก.</small></div>`).join('') || '<div class="kpi"><span>ก้อนพร้อมขาย</span><b>0</b><small>&nbsp;</small></div>'}</div>` : '';
+    if (stockTab === 'ingots') { ingotCache = list; const ids = new Set(list.map(m => m.id)); ingotSel.forEach(id => { if (!ids.has(id)) ingotSel.delete(id); }); }
+    body += stockTab === 'ingots' && list.length ? '<p class="muted sm">ติ๊กเลือกก้อน แล้วกด "รวมเป็นก้อนเดียว" หรือ "ส่งโรงสกัด" · ขายให้ร้านรับซื้อได้ที่หน้า ขาย</p>' : '';
+    body += `<div class="card list">${list.map(m => stockTab === 'ingots' ? ingotPickRow(m) : meltRow(m)).join('') || '<p class="muted center-t">ยังไม่มีก้อน</p>'}</div>`;
+    if (stockTab === 'ingots') body += ingotBarHtml();
+  } else {
+    body += `<div class="card"><p class="muted sm">ของที่ติดป้าย "ขายทั้งชิ้น" ตอนรับซื้อ — ขายได้ในเฟส 2.3</p><div class="list">${wholeItems.map(i => `<div class="list-row"><div><b>${esc(M[i.metal] ? M[i.metal].label : i.metal)} ${esc(i.pct)}%</b> · ${esc(i.item_kind || '')}<br><span class="muted sm">${esc(i.bill_no)} · ${thDateTime(i.created_at)}</span></div><div class="right"><b>${gram(i.weight)} ก.</b><br><span class="muted sm">ทุน ${money(i.amount)}</span></div></div>`).join('') || '<p class="muted center-t">ไม่มี</p>'}</div></div>`;
+  }
+  $('.main').innerHTML = `<h1 class="screen-title">สต๊อก / หลอม</h1>` + body;
+  $$('[data-stab]').forEach(b => b.onclick = () => { stockTab = b.dataset.stab; renderStock(); });
+  $$('[data-smetal]').forEach(b => b.onclick = () => { stockMetal = b.dataset.smetal; stockSel.clear(); renderStock(); });
+  $$('[data-sid]').forEach(c => c.onchange = () => { const id = +c.dataset.sid; c.checked ? stockSel.add(id) : stockSel.delete(id); renderStockBar(); c.closest('.stock-row').classList.toggle('on', c.checked); });
+  const sa = $('#selAll'); if (sa) sa.onclick = () => { meltItems.filter(i => i.metal === stockMetal).forEach(i => stockSel.add(i.id)); renderStock(); };
+  const sn = $('#selNone'); if (sn) sn.onclick = () => { stockSel.clear(); renderStock(); };
+  const dm = $('#doMelt'); if (dm) dm.onclick = meltModal;
+  $$('[data-melt]').forEach(r => r.onclick = () => meltDetail(r.dataset.melt));
+  if (stockTab === 'ingots') bindIngotPick();
+}
+function renderStockBar() {
+  const list = stockCache.filter(i => stockSel.has(i.id));
+  const w = list.reduce((t, i) => t + num(i.weight), 0), f = list.reduce((t, i) => t + fine(i.weight, i.pct), 0), c = list.reduce((t, i) => t + num(i.amount), 0);
+  const bar = $('.melt-bar'); if (!bar) return;
+  bar.classList.toggle('show', list.length > 0);
+  bar.querySelector('div').innerHTML = `<b>เลือก ${list.length} รายการ · ${gram(w)} ก.</b><br><span class="sm">% เฉลี่ย ${w ? (f / w * 100).toFixed(2) : '-'} · เนื้อที่คาด ${gram(f)} ก. · ทุน ${money(c)}</span>`;
+  $('#doMelt').disabled = !list.length;
+}
+function meltRow(m) {
+  const M = metals();
+  const st = { ready: m.within_tolerance ? '<span class="pill ok">พร้อมขาย</span>' : '<span class="pill bad">เกินเกณฑ์ ตรวจสอบ</span>', sold: '<span class="pill">ขายแล้ว</span>', refining: '<span class="pill">อยู่ที่โรงสกัด</span>', cancelled: '<span class="pill bad">ยกเลิก</span>', merged: '<span class="pill">รวมเข้าก้อนใหม่แล้ว</span>' };
+  return `<button class="list-row ${m.status === 'cancelled' ? 'void' : ''}" data-melt="${m.id}"><div><b>${esc(m.lot_no)}</b> <span class="muted sm">${esc(M[m.metal] ? M[m.metal].label : m.metal)} · ${thDateTime(m.created_at)} · ${esc(m.staff_code || '')}</span><br>
+    <span class="sm">${gram(m.out_weight)} ก. @ ${esc(m.measured_pct)}% = เนื้อ <b>${gram(m.out_fine)} ก.</b> · ต่างจากคาด ${num(m.fine_diff) >= 0 ? '+' : ''}${gram(m.fine_diff)} ก. (${num(m.fine_diff_pct) >= 0 ? '+' : ''}${num(m.fine_diff_pct).toFixed(2)}%)</span></div>
+    <div class="right">${st[m.status] || ''}<br><span class="muted sm">ทุน ${money(num(m.items_cost) + num(m.melt_cost))}</span></div></button>`;
+}
+function meltCalc(list, outW, pct, cost) {
+  const inW = list.reduce((t, i) => t + num(i.weight), 0), inF = list.reduce((t, i) => t + fine(i.weight, i.pct), 0), itemsCost = list.reduce((t, i) => t + num(i.amount), 0);
+  const outF = fine(outW, pct), loss = inW - num(outW), diff = outF - inF, diffPct = inF ? diff / inF * 100 : 0;
+  const total = itemsCost + num(cost);
+  return { inW, inF, inPct: inW ? inF / inW * 100 : 0, itemsCost, outF, loss, lossPct: inW ? loss / inW * 100 : 0, diff, diffPct, total, perFine: outF ? total / outF : 0 };
+}
+function meltModal() {
+  const list = stockCache.filter(i => stockSel.has(i.id)); if (!list.length) return;
+  const cfg = meltCfg(), M = metals(), metal = list[0].metal;
+  const base = meltCalc(list, 0, 0, 0);
+  modal(`<h2>หลอม ${esc(M[metal] ? M[metal].label : metal)} ${list.length} รายการ</h2>
+    <div class="melt-sum"><div><span>น้ำหนักก่อนหลอม</span><b>${gram(base.inW)} ก.</b></div><div><span>% เฉลี่ย</span><b>${base.inPct.toFixed(2)}%</b></div><div><span>เนื้อที่คาด</span><b>${gram(base.inF)} ก.</b></div><div><span>ทุนของ</span><b>${money(base.itemsCost)}</b></div></div>
+    <div class="grid2">
+      <label>น้ำหนักก้อนหลังหลอม (ก.) *<input id="mw" inputmode="decimal" autofocus placeholder="0.00"></label>
+      <label>% ที่วัดได้ *<input id="mp" inputmode="decimal" placeholder="เช่น 95.20"></label>
+    </div>
+    <label>ค่าหลอม (บาท)<input id="mc" inputmode="decimal" value="${esc(cfg.default_cost)}"></label>
+    <label>หมายเหตุ<input id="mn" placeholder="ไม่บังคับ เช่น ร้านที่ส่งหลอม"></label>
+    <div id="mcalc" class="melt-calc"></div>
+    <div class="row end"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button><button class="btn gold" id="mOk">บันทึกการหลอม</button></div>`, { sticky: true });
+  const draw = () => {
+    const w = num($('#mw').value), p = num($('#mp').value), c = num($('#mc').value);
+    if (!w || !p) { $('#mcalc').innerHTML = '<p class="muted sm">ใส่น้ำหนักหลังหลอมและ % ที่วัดได้ ระบบจะเทียบกับที่คาดไว้ให้</p>'; return; }
+    const r = meltCalc(list, w, p, c), ok = Math.abs(r.diffPct) <= num(cfg.tolerance_pct), lossWarn = r.lossPct > num(cfg.loss_warn_pct);
+    $('#mcalc').innerHTML = `
+      <div class="mc-row"><span>น้ำหนักหาย</span><b class="${lossWarn ? 'bad' : ''}">${gram(r.loss)} ก. (${r.lossPct.toFixed(2)}%)${lossWarn ? ' ⚠' : ''}</b></div>
+      <div class="mc-row"><span>เนื้อทองจริง</span><b>${gram(r.outF)} ก.</b></div>
+      <div class="mc-row"><span>ต่างจากที่คาด</span><b class="${ok ? 'okc' : 'bad'}">${r.diff >= 0 ? '+' : ''}${gram(r.diff)} ก. (${r.diffPct >= 0 ? '+' : ''}${r.diffPct.toFixed(2)}%)</b></div>
+      <div class="mc-verdict ${ok ? 'ok' : 'bad'}">${ok ? `✅ อยู่ในเกณฑ์ (±${cfg.tolerance_pct}%) — พร้อมขาย` : `⚠️ เกินเกณฑ์ ±${cfg.tolerance_pct}% — ควรวัด % ซ้ำก่อนขาย`}</div>
+      <div class="mc-row"><span>ทุนรวม (ของ + ค่าหลอม)</span><b>${money(r.total)}</b></div>
+      <div class="mc-row"><span>ทุนต่อกรัมเนื้อทอง</span><b>${money(r.perFine, 2)} บาท</b></div>
+      ${r.loss < 0 ? '<p class="bad sm">น้ำหนักหลังหลอมมากกว่าก่อนหลอม — ตรวจตัวเลข</p>' : ''}`;
+  };
+  ['#mw', '#mp', '#mc'].forEach(id => { $(id).oninput = draw; }); draw();
+  $('#mOk').onclick = async (ev) => {
+    const w = num($('#mw').value), p = num($('#mp').value);
+    if (!w) return toast(ERR.BAD_WEIGHT, 'err'); if (!p || p > 100) return toast(ERR.BAD_PCT, 'err');
+    busy(ev.target, true);
+    try {
+      const m = await api('create_melt', { p_token: S.session.token, p_item_ids: list.map(i => i.id), p_out_weight: w, p_measured_pct: p, p_melt_cost: num($('#mc').value), p_note: $('#mn').value.trim() || null });
+      toast(`บันทึกก้อน ${m.lot_no} แล้ว`); stockSel.clear(); closeModal(); stockTab = 'ingots'; renderStock();
+    } catch (e) { busy(ev.target, false); toast(errText(e), 'err'); }
+  };
+}
+async function meltDetail(id) {
+  let m;
+  try { m = await api('get_melt', { p_token: S.session.token, p_id: id }); } catch (e) { return toast(errText(e), 'err'); }
+  if (!m) return;
+  const M = metals(), total = num(m.items_cost) + num(m.melt_cost);
+  modal(`<h2>ก้อน ${esc(m.lot_no)}</h2>
+    <p class="muted">${esc(M[m.metal] ? M[m.metal].label : m.metal)} · หลอมเมื่อ ${thDateTime(m.created_at)} โดย ${esc(m.staff_code || '')}${m.note ? ' · ' + esc(m.note) : ''}</p>
+    ${m.status === 'cancelled' ? `<div class="banner warn">ยกเลิกแล้ว: ${esc(m.cancel_reason || '')}</div>` : ''}
+    <div class="melt-sum"><div><span>ก่อนหลอม</span><b>${gram(m.input_weight)} ก.</b><small>${esc(m.input_pct)}% · เนื้อ ${gram(m.input_fine)}</small></div>
+      <div><span>หลังหลอม</span><b>${gram(m.out_weight)} ก.</b><small>${esc(m.measured_pct)}% · เนื้อ ${gram(m.out_fine)}</small></div>
+      <div><span>ต่างจากคาด</span><b class="${m.within_tolerance ? 'okc' : 'bad'}">${num(m.fine_diff) >= 0 ? '+' : ''}${gram(m.fine_diff)} ก.</b><small>${num(m.fine_diff_pct).toFixed(2)}% · ${m.within_tolerance ? 'ในเกณฑ์' : 'เกินเกณฑ์'}</small></div>
+      <div><span>ทุนรวม</span><b>${money(total)}</b><small>${money(num(m.out_fine) ? total / num(m.out_fine) : 0, 2)} บ./ก.เนื้อ</small></div></div>
+    ${m.children && m.children.length ? `<h3>รวมมาจาก ${m.children.length} ก้อน</h3><div class="list">${m.children.map(c => `<div class="list-row"><div><b>${esc(c.lot_no)}</b> <span class="muted sm">${thDateTime(c.created_at)} · ${c.item_count} รายการ</span></div><div class="right"><b>${gram(c.out_weight)} ก.</b><br><span class="muted sm">${esc(c.measured_pct)}% · เนื้อ ${gram(c.out_fine)}</span></div></div>`).join('')}</div>` : ''}
+    ${m.source === 'refinery_return' ? '' : `<h3>มาจาก ${m.items.length} รายการ${m.children && m.children.length ? ' (จากทุกก้อน)' : ''}</h3>`}
+    <div class="list">${m.items.map(i => `<div class="list-row"><div><b>${esc(i.bill_no)}</b> <span class="muted sm">${thDateTime(i.bill_created_at)}</span><br><span class="sm">${esc(i.pct)}% · ${esc(i.item_kind || '')} · ${esc(i.customer_name || '')}</span></div><div class="right"><b>${gram(i.weight)} ก.</b><br><span class="muted sm">${money(i.amount)}</span></div></div>`).join('')}</div>
+    <div class="row end"><button class="btn ghost" onclick="closeModal()">ปิด</button>${isOwner() && m.status === 'ready' ? '<button class="btn danger" id="cMelt">ยกเลิกการหลอม</button>' : ''}</div>`, { wide: true });
+  const cm = $('#cMelt'); if (cm) cm.onclick = async () => {
+    const reason = prompt('เหตุผลที่ยกเลิกการหลอม ' + m.lot_no + ' (ของจะกลับเข้าสต๊อกรอหลอม)'); if (!reason) return;
+    try { await api('cancel_melt', { p_token: S.session.token, p_id: m.id, p_reason: reason }); toast('ยกเลิกการหลอมแล้ว ของกลับเข้าสต๊อก'); closeModal(); renderStock(); } catch (e) { toast(errText(e), 'err'); }
+  };
+}
+
+// ---------------------------------------------------------------- เฟส 2.3: ขาย
+function saleCfg() { return Object.assign({ staff_can_sell: false }, (S.settings && S.settings.sale) || {}); }
+const canSell = () => isOwner() || saleCfg().staff_can_sell;
+let sellTab = 'new', sellData = null;
+function newSaleDraft() { return { buyer_type: 'shop', buyer_name: '', buyer_phone: '', sel: {}, transport_cost: '', other_cost: '', paid: false, pay_method: 'transfer', due_date: '', note: '', files: [] }; }
+async function renderSell() {
+  shell('ขาย', '<div class="center"><span class="spin big"></span></div>');
+  if (!canSell()) { $('.main').innerHTML = '<h1 class="screen-title">ขาย</h1><div class="banner warn">เจ้าของยังไม่เปิดสิทธิ์ให้พนักงานบันทึกการขาย</div>'; return; }
+  if (!S.session.token || !S.online) { $('.main').innerHTML = '<h1 class="screen-title">ขาย</h1><div class="banner warn">ต้องออนไลน์</div>'; return; }
+  let pending = [];
+  try {
+    const calls = [api('list_sales', { p_token: S.session.token, p_scope: 'pending' })];
+    if (sellTab === 'new') calls.push(api('list_sellable', { p_token: S.session.token }));
+    if (sellTab === 'history') calls.push(api('list_sales', { p_token: S.session.token, p_scope: 'all' }));
+    const r = await Promise.all(calls); pending = r[0];
+    if (sellTab === 'new') sellData = r[1]; if (sellTab === 'history') S._salesAll = r[1];
+  } catch (e) { toast(errText(e), 'err'); }
+  if (S.screen !== 'sell') return;
+  const overdue = pending.filter(x => x.due_date && x.due_date < bkkDate()).length;
+  const tabs = [['new', 'ขายใหม่'], ['refinery', 'โรงสกัด'], ['pending', `รอรับเงิน (${pending.length})${overdue ? ' ⚠' : ''}`], ['history', 'ประวัติขาย']];
+  let body = `<div class="seg">${tabs.map(t => `<button data-sell="${t[0]}" class="${sellTab === t[0] ? 'on' : ''}">${t[1]}</button>`).join('')}</div>`;
+  if (sellTab === 'new') body += `<div id="sellForm">${sellFormHtml()}</div>`;
+  else if (sellTab === 'refinery') body += await refineryTabHtml();
+  else {
+    const list = sellTab === 'pending' ? pending : (S._salesAll || []);
+    const pendTotal = pending.reduce((t, x) => t + num(x.total_amount), 0);
+    if (sellTab === 'pending') body += `<div class="kpis"><div class="kpi"><span>ยอดรอรับเงิน</span><b>${money(pendTotal)}</b><small>${pending.length} รายการ</small></div>${overdue ? `<div class="kpi"><span>เลยกำหนด</span><b class="bad">${overdue}</b><small>รายการ</small></div>` : ''}</div>`;
+    body += `<div class="card list">${list.map(saleRow).join('') || '<p class="muted center-t">ไม่มีรายการ</p>'}</div>`;
+  }
+  $('.main').innerHTML = `<h1 class="screen-title">ขาย</h1>` + body;
+  $$('[data-sell]').forEach(b => b.onclick = () => { sellTab = b.dataset.sell; renderSell(); });
+  $$('[data-sale]').forEach(r => r.onclick = () => saleDetail(r.dataset.sale));
+  if (sellTab === 'new') bindSellForm();
+  if (sellTab === 'refinery') bindRefineryTab();
+}
+function saleRow(x) {
+  const st = { pending_payment: x.due_date && x.due_date < bkkDate() ? '<span class="pill bad">เลยกำหนดรับเงิน</span>' : '<span class="pill warn">รอรับเงิน</span>', paid: '<span class="pill ok">รับเงินแล้ว</span>', cancelled: '<span class="pill bad">ยกเลิก</span>' };
+  const profit = num(x.total_amount) - num(x.total_cost) - num(x.transport_cost) - num(x.other_cost);
+  return `<button class="list-row ${x.status === 'cancelled' ? 'void' : ''}" data-sale="${x.id}"><div><b>${esc(x.sale_no)}</b> <span class="muted sm">${thDateTime(x.created_at)} · ${esc(x.staff_code || '')}</span><br>
+    <span class="sm">${x.buyer_type === 'refinery' ? '🏭' : '🏪'} ${esc(x.buyer_name)} · ${x.line_count || ''} รายการ${x.doc_count ? ` · 📎${x.doc_count}` : ''}${x.status === 'pending_payment' && x.due_date ? ` · กำหนด ${esc(dueTh(x.due_date))}` : ''}</span></div>
+    <div class="right"><b>${money(x.total_amount)}</b><br>${st[x.status] || ''}<br><span class="sm ${profit >= 0 ? 'okc' : 'bad'}">กำไร ${money(profit)}</span></div></button>`;
+}
+function sellFormHtml() {
+  const d = S.saleDraft = S.saleDraft || newSaleDraft(), M = metals(), data = sellData || { melts: [], items: [], buyers: [] };
+  const valid = new Set([...data.melts.map(m => 'melt:' + m.id), ...data.items.map(i => 'item:' + i.id)]);
+  Object.keys(d.sel).forEach(k => { if (!valid.has(k)) delete d.sel[k]; });
+  const row = (key, title, sub, w, pct, cost) => { const s = d.sel[key]; return `<div class="sell-item ${s ? 'on' : ''}">
+      <label class="stock-row"><input type="checkbox" data-pick="${key}" ${s ? 'checked' : ''}><div class="grow"><b>${title}</b><br><span class="muted sm">${sub}</span></div><div class="right"><b>${gram(w)} ก.</b><br><span class="muted sm">${esc(pct)}% · ทุน ${money(cost)}</span></div></label>
+      ${s ? `<div class="sell-in grid3"><label>% ที่ผู้ซื้อวัด<input data-bpct="${key}" inputmode="decimal" value="${esc(s.buyer_pct)}" placeholder="${esc(pct)}"></label><label>ขายได้ (บาท) *<input data-amt="${key}" inputmode="decimal" value="${esc(s.amount)}" placeholder="0"></label><div class="sell-calc" data-calc="${key}"></div></div>` : ''}</div>`; };
+  return `<div class="card"><h2>ผู้ซื้อ</h2>
+      <div class="seg"><button data-btype="shop" class="${d.buyer_type === 'shop' ? 'on' : ''}">🏪 ร้านรับซื้อทอง</button><button data-btype="refinery" class="${d.buyer_type === 'refinery' ? 'on' : ''}">🏭 โรงหลอม/สกัด</button></div>
+      <div class="grid2"><label>ชื่อผู้ซื้อ *<input id="sbName" list="buyerList" value="${esc(d.buyer_name)}" placeholder="เช่น ร้านทองเยาวราช"></label><label>เบอร์โทร<input id="sbPhone" inputmode="tel" value="${esc(d.buyer_phone)}"></label></div>
+      <datalist id="buyerList">${data.buyers.map(b => `<option value="${esc(b.name)}">`).join('')}</datalist></div>
+    <div class="card"><div class="card-h"><h2>เลือกของที่ขาย</h2><span class="muted sm">${data.melts.length} ก้อน · ${data.items.length} ชิ้น</span></div>
+      ${data.melts.length ? '<div class="lbl">ก้อนหลอมแล้ว</div>' : ''}
+      ${data.melts.map(m => row('melt:' + m.id, `${esc(m.lot_no)} · ${esc(M[m.metal] ? M[m.metal].label : m.metal)}`, `เนื้อ ${gram(m.out_fine)} ก. · ${m.within_tolerance ? 'ในเกณฑ์' : '⚠ เกินเกณฑ์'}`, m.out_weight, m.measured_pct, num(m.items_cost) + num(m.melt_cost))).join('')}
+      ${data.items.length ? '<div class="lbl">ขายทั้งชิ้น</div>' : ''}
+      ${data.items.map(i => row('item:' + i.id, `${esc(M[i.metal] ? M[i.metal].label : i.metal)} ${esc(i.pct)}% · ${esc(i.item_kind || '')}`, `${esc(i.bill_no)} · ${thDateTime(i.created_at)}`, i.weight, i.pct, i.amount)).join('')}
+      ${!data.melts.length && !data.items.length ? '<p class="muted center-t">ยังไม่มีของพร้อมขาย — หลอมก้อนที่หน้า สต๊อก/หลอม ก่อน</p>' : ''}</div>
+    <div class="card"><h2>ค่าใช้จ่าย & การรับเงิน</h2>
+      <div class="grid2"><label>ค่าขนส่ง (บาท)<input id="sTrans" inputmode="decimal" value="${esc(d.transport_cost)}" placeholder="0"></label><label>ค่าใช้จ่ายอื่น (บาท)<input id="sOther" inputmode="decimal" value="${esc(d.other_cost)}" placeholder="0"></label></div>
+      <div class="seg"><button data-paid="1" class="${d.paid ? 'on' : ''}">ได้รับเงินแล้ว</button><button data-paid="0" class="${!d.paid ? 'on' : ''}">รอรับเงิน</button></div>
+      <div class="grid2"><label>ช่องทาง<select id="sMethod"><option value="transfer" ${d.pay_method === 'transfer' ? 'selected' : ''}>โอน</option><option value="cash" ${d.pay_method === 'cash' ? 'selected' : ''}>เงินสด</option><option value="cheque" ${d.pay_method === 'cheque' ? 'selected' : ''}>เช็ค</option></select></label>
+        ${d.paid ? '' : `<label>กำหนดรับเงิน<input id="sDue" type="date" value="${esc(d.due_date)}" min="${bkkDate()}"></label>`}</div>
+      <label>หมายเหตุ<input id="sNote" value="${esc(d.note)}" placeholder="ไม่บังคับ"></label>
+      <label>แนบเอกสาร/ใบรับซื้อจากผู้ซื้อ (รูป)<input id="sFiles" type="file" accept="image/*" multiple></label>
+      <div id="sFileList" class="muted sm">${d.files.length ? d.files.map(f => '📎 ' + esc(f.name)).join(' · ') : ''}</div></div>
+    <div class="sell-total" id="sTotal"></div>
+    <button class="btn gold block xl" id="sSave">บันทึกการขาย</button>`;
+}
+function sellSummary() {
+  const d = S.saleDraft, data = sellData || { melts: [], items: [] };
+  let amt = 0, cost = 0, n = 0;
+  Object.entries(d.sel).forEach(([k, s]) => {
+    const [kind, id] = k.split(':');
+    const src = kind === 'melt' ? data.melts.find(m => m.id === id) : data.items.find(i => String(i.id) === id); if (!src) return;
+    const w = kind === 'melt' ? num(src.out_weight) : num(src.weight), pct = kind === 'melt' ? num(src.measured_pct) : num(src.pct);
+    const c = kind === 'melt' ? num(src.items_cost) + num(src.melt_cost) : num(src.amount), bp = num(s.buyer_pct) || pct, a = num(s.amount), f = w * bp / 100;
+    n++; amt += a; cost += c;
+    const el = $(`[data-calc="${k}"]`);
+    if (el) el.innerHTML = a ? `<span>ต่อกรัมเนื้อ ${money(f ? a / f : 0, 2)}</span><b class="${a - c >= 0 ? 'okc' : 'bad'}">กำไร ${money(a - c)}</b>${bp < pct ? `<span class="bad">% ต่ำกว่าเรา ${(pct - bp).toFixed(2)}</span>` : ''}` : `<span class="muted">ทุน ${money(c)}</span>`;
+  });
+  const exp = num(d.transport_cost) + num(d.other_cost), profit = amt - cost - exp;
+  $('#sTotal').innerHTML = `<div><span>ขาย ${n} รายการ</span><b>${money(amt)}</b></div><div><span>ทุนของ</span><b>${money(cost)}</b></div><div><span>ค่าใช้จ่าย</span><b>${money(exp)}</b></div><div><span>กำไรสุทธิ</span><b class="${profit >= 0 ? 'okc' : 'bad'}">${money(profit)}</b></div>`;
+  $('#sSave').disabled = !n;
+}
+function bindSellForm() {
+  const d = S.saleDraft;
+  $$('[data-btype]').forEach(b => b.onclick = () => { d.buyer_type = b.dataset.btype; renderSellForm(); });
+  $$('[data-paid]').forEach(b => b.onclick = () => { d.paid = b.dataset.paid === '1'; renderSellForm(); });
+  $('#sbName').oninput = (e) => { d.buyer_name = e.target.value; const b = (sellData.buyers || []).find(x => x.name === e.target.value); if (b && b.phone && !d.buyer_phone) { d.buyer_phone = b.phone; $('#sbPhone').value = b.phone; } };
+  $('#sbPhone').oninput = (e) => { d.buyer_phone = e.target.value; };
+  $$('[data-pick]').forEach(c => c.onchange = () => { if (c.checked) d.sel[c.dataset.pick] = { buyer_pct: '', amount: '' }; else delete d.sel[c.dataset.pick]; renderSellForm(); });
+  $$('[data-bpct]').forEach(i => i.oninput = () => { d.sel[i.dataset.bpct].buyer_pct = i.value; sellSummary(); });
+  $$('[data-amt]').forEach(i => i.oninput = () => { d.sel[i.dataset.amt].amount = i.value; sellSummary(); });
+  $('#sTrans').oninput = (e) => { d.transport_cost = e.target.value; sellSummary(); };
+  $('#sOther').oninput = (e) => { d.other_cost = e.target.value; sellSummary(); };
+  $('#sMethod').onchange = (e) => { d.pay_method = e.target.value; };
+  const due = $('#sDue'); if (due) due.onchange = (e) => { d.due_date = e.target.value; };
+  $('#sNote').oninput = (e) => { d.note = e.target.value; };
+  $('#sFiles').onchange = async (e) => {
+    for (const f of Array.from(e.target.files)) { try { d.files.push({ name: f.name.replace(/\.[^.]+$/, ''), data: await compressImage(f, 1400, 0.7) }); } catch (err) { toast('อ่านรูปไม่ได้: ' + f.name, 'err'); } }
+    $('#sFileList').innerHTML = d.files.map(f => '📎 ' + esc(f.name)).join(' · ');
+  };
+  $('#sSave').onclick = saveSale;
+  sellSummary();
+}
+function renderSellForm() { const sc = window.scrollY; $('#sellForm').innerHTML = sellFormHtml(); bindSellForm(); window.scrollTo(0, sc); }
+async function saveSale(ev) {
+  const d = S.saleDraft;
+  if (!d.buyer_name.trim()) return toast('ใส่ชื่อผู้ซื้อ', 'err');
+  const lines = Object.entries(d.sel).map(([k, s]) => { const [kind, ref] = k.split(':'); return { kind, ref, buyer_pct: s.buyer_pct === '' ? null : num(s.buyer_pct), amount: num(s.amount) }; });
+  if (!lines.length) return toast('เลือกของที่ขาย', 'err');
+  if (lines.some(l => !l.amount)) return toast('ใส่ยอดขายให้ครบทุกรายการ', 'err');
+  if (!d.paid && !d.due_date && !confirm('ยังไม่ได้ใส่กำหนดรับเงิน บันทึกต่อไหม?')) return;
+  const total = lines.reduce((t, l) => t + l.amount, 0);
+  if (!confirm(`บันทึกการขายให้ ${d.buyer_name} ยอด ${money(total)} บาท ${d.paid ? '(ได้รับเงินแล้ว)' : '(รอรับเงิน)'}?`)) return;
+  busy(ev.target, true);
+  try {
+    const sale = await api('create_sale', { p_token: S.session.token, p_sale: { buyer_type: d.buyer_type, buyer_name: d.buyer_name.trim(), buyer_phone: d.buyer_phone.trim(), lines, transport_cost: num(d.transport_cost), other_cost: num(d.other_cost), paid: d.paid, pay_method: d.pay_method, due_date: d.paid ? null : (d.due_date || null), note: d.note.trim() } });
+    let docFail = 0;
+    for (const f of d.files) { try { await api('add_sale_doc', { p_token: S.session.token, p_sale: sale.id, p_name: f.name, p_data: f.data }); } catch (e) { docFail++; } }
+    toast(`บันทึกการขาย ${sale.sale_no} แล้ว${docFail ? ` (แนบเอกสารไม่สำเร็จ ${docFail} ไฟล์)` : ''}`, docFail ? 'warn' : 'ok');
+    S.saleDraft = null; sellTab = d.paid ? 'history' : 'pending'; renderSell();
+  } catch (e) { busy(ev.target, false); toast(errText(e), 'err'); }
+}
+function compressImage(file, max, q) {
+  return new Promise((res, rej) => { const img = new Image(); img.onload = () => { const r = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * r); c.height = Math.round(img.height * r); const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height); let out = c.toDataURL('image/jpeg', q); if (out.length > 650000) out = c.toDataURL('image/jpeg', 0.5); URL.revokeObjectURL(img.src); res(out); }; img.onerror = rej; img.src = URL.createObjectURL(file); });
+}
+async function saleDetail(id) {
+  let x; try { x = await api('get_sale', { p_token: S.session.token, p_id: id }); } catch (e) { return toast(errText(e), 'err'); }
+  if (!x) return;
+  const M = metals(), exp = num(x.transport_cost) + num(x.other_cost), profit = num(x.total_amount) - num(x.total_cost) - exp;
+  modal(`<h2>${esc(x.sale_no)} ${x.buyer_type === 'refinery' ? '🏭' : '🏪'} ${esc(x.buyer_name)}</h2>
+    <p class="muted">${thDateTime(x.created_at)} · บันทึกโดย ${esc(x.staff_code || '')}${x.buyer_phone ? ' · โทร ' + esc(x.buyer_phone) : ''}</p>
+    ${x.status === 'cancelled' ? `<div class="banner warn">ยกเลิกแล้ว: ${esc(x.cancel_reason || '')}</div>` : x.status === 'paid' ? `<div class="banner info">รับเงินแล้ว ${x.paid_at ? thDateTime(x.paid_at) : ''} · ${esc({ transfer: 'โอน', cash: 'เงินสด', cheque: 'เช็ค' }[x.pay_method] || x.pay_method || '')}</div>` : `<div class="banner warn">รอรับเงิน${x.due_date ? ' · กำหนด ' + esc(dueTh(x.due_date)) : ''}</div>`}
+    <table class="tbl sale-tbl"><thead><tr><th>รายการ</th><th>น้ำหนัก</th><th>% เรา/ผู้ซื้อ</th><th>ขายได้</th><th>กำไร</th></tr></thead><tbody>
+      ${x.lines.map(l => `<tr><td>${esc(l.label)}<br><span class="muted sm">${esc(M[l.metal] ? M[l.metal].label : l.metal)}</span></td><td>${gram(l.weight)}</td><td>${esc(l.our_pct)} / <b class="${num(l.buyer_pct) < num(l.our_pct) ? 'bad' : ''}">${esc(l.buyer_pct)}</b></td><td>${money(l.amount)}</td><td class="${num(l.amount) - num(l.cost) >= 0 ? 'okc' : 'bad'}">${money(num(l.amount) - num(l.cost))}</td></tr>`).join('')}
+    </tbody></table>
+    <div class="sell-total"><div><span>ยอดขาย</span><b>${money(x.total_amount)}</b></div><div><span>ทุนของ</span><b>${money(x.total_cost)}</b></div><div><span>ค่าใช้จ่าย</span><b>${money(exp)}</b></div><div><span>กำไรสุทธิ</span><b class="${profit >= 0 ? 'okc' : 'bad'}">${money(profit)}</b></div></div>
+    ${x.fine_our ? `<p class="muted sm">เนื้อทองตามเรา ${gram(x.fine_our)} ก. · ตามผู้ซื้อ ${gram(x.fine_buyer)} ก. (ต่าง ${gram(num(x.fine_buyer) - num(x.fine_our))} ก.)</p>` : ''}
+    ${x.note ? `<p class="sm">หมายเหตุ: ${esc(x.note)}</p>` : ''}
+    <h3>เอกสาร (${x.docs.length})</h3><div class="docs">${x.docs.map(dc => `<button class="btn ghost sm" data-doc="${dc.id}">📎 ${esc(dc.name || 'เอกสาร')}</button>`).join('')}
+      ${x.status !== 'cancelled' ? '<label class="btn ghost sm">+ แนบเพิ่ม<input type="file" id="addDoc" accept="image/*" multiple hidden></label>' : ''}</div>
+    <div class="row end wrap"><button class="btn ghost" onclick="closeModal()">ปิด</button>
+      ${isOwner() && x.status !== 'cancelled' ? '<button class="btn ghost" id="cSale">ยกเลิกการขาย</button>' : ''}
+      ${x.status === 'pending_payment' && canSell() ? '<button class="btn gold" id="pSale">ได้รับเงินแล้ว</button>' : ''}</div>`, { wide: true });
+  $$('[data-doc]').forEach(b => b.onclick = async () => { try { const dc = await api('get_sale_doc', { p_token: S.session.token, p_doc: b.dataset.doc }); const w = window.open(); if (w) { w.document.title = dc.name || 'เอกสาร'; w.document.body.style.margin = 0; w.document.body.innerHTML = `<img src="${dc.data}" style="max-width:100%">`; } } catch (e) { toast(errText(e), 'err'); } });
+  const ad = $('#addDoc'); if (ad) ad.onchange = async (e) => { for (const f of Array.from(e.target.files)) { try { await api('add_sale_doc', { p_token: S.session.token, p_sale: x.id, p_name: f.name.replace(/\.[^.]+$/, ''), p_data: await compressImage(f, 1400, 0.7) }); } catch (err) { toast(errText(err), 'err'); } } toast('แนบเอกสารแล้ว'); saleDetail(x.id); };
+  const ps = $('#pSale'); if (ps) ps.onclick = async () => {
+    const amt = prompt(`ยอดที่ได้รับจริง (บาท) — ปกติ ${x.total_amount}`, x.total_amount); if (amt === null) return;
+    try { await api('mark_sale_paid', { p_token: S.session.token, p_id: x.id, p_method: x.pay_method || 'transfer', p_amount: num(amt) || null }); toast('บันทึกรับเงินแล้ว'); closeModal(); renderSell(); } catch (e) { toast(errText(e), 'err'); }
+  };
+  const cs = $('#cSale'); if (cs) cs.onclick = async () => {
+    const reason = prompt('เหตุผลที่ยกเลิกการขาย ' + x.sale_no + ' (ของจะกลับเข้าสต๊อก)'); if (!reason) return;
+    try { await api('cancel_sale', { p_token: S.session.token, p_id: x.id, p_reason: reason }); toast('ยกเลิกการขายแล้ว ของกลับเข้าสต๊อก'); closeModal(); renderSell(); } catch (e) { toast(errText(e), 'err'); }
+  };
+}
+
+// ---------------------------------------------------------------- รวมก้อน / ส่งโรงสกัด
+let ingotSel = new Set(), ingotCache = [];
+function ingotPickRow(m) {
+  return `<div class="ingot-pick ${ingotSel.has(m.id) ? 'on' : ''}"><input type="checkbox" data-ising="${m.id}" ${ingotSel.has(m.id) ? 'checked' : ''} aria-label="เลือก ${esc(m.lot_no)}">${meltRow(m)}</div>`;
+}
+function ingotBarHtml() {
+  const list = ingotCache.filter(m => ingotSel.has(m.id));
+  const w = list.reduce((t, m) => t + num(m.out_weight), 0), f = list.reduce((t, m) => t + num(m.out_fine), 0);
+  const metalsSel = new Set(list.map(m => m.metal));
+  return `<div class="melt-bar ${list.length ? 'show' : ''}" id="ingotBar"><div><b>เลือก ${list.length} ก้อน · ${gram(w)} ก.</b><br><span class="sm">เนื้อรวม ${gram(f)} ก.${metalsSel.size > 1 ? ' · ⚠ ต่างโลหะ' : ''}</span></div>
+    <div class="row" style="margin:0"><button class="btn ghost sm" id="doMerge" ${list.length >= 2 && metalsSel.size === 1 ? '' : 'disabled'} style="background:#fff">รวมเป็นก้อนเดียว</button>${canSell() ? `<button class="btn gold sm" id="doSend" ${list.length ? '' : 'disabled'}>ส่งโรงสกัด</button>` : ''}</div></div>`;
+}
+function bindIngotPick() {
+  $$('[data-ising]').forEach(c => c.onchange = () => { c.checked ? ingotSel.add(c.dataset.ising) : ingotSel.delete(c.dataset.ising); c.closest('.ingot-pick').classList.toggle('on', c.checked); $('#ingotBar').outerHTML = ingotBarHtml(); bindIngotBar(); });
+  bindIngotBar();
+}
+function bindIngotBar() {
+  const mg = $('#doMerge'); if (mg) mg.onclick = mergeModal;
+  const sd = $('#doSend'); if (sd) sd.onclick = sendModal;
+}
+function mergeModal() {
+  const list = ingotCache.filter(m => ingotSel.has(m.id)); const cfg = meltCfg();
+  const inW = list.reduce((t, m) => t + num(m.out_weight), 0), inF = list.reduce((t, m) => t + num(m.out_fine), 0), cost = list.reduce((t, m) => t + num(m.items_cost) + num(m.melt_cost), 0);
+  modal(`<h2>รวม ${list.length} ก้อนเป็นก้อนเดียว</h2>
+    <p class="muted sm">${list.map(m => esc(m.lot_no)).join(', ')}</p>
+    <div class="melt-sum"><div><span>น้ำหนักรวม</span><b>${gram(inW)} ก.</b></div><div><span>% เฉลี่ย</span><b>${inW ? (inF / inW * 100).toFixed(2) : '-'}%</b></div><div><span>เนื้อรวม</span><b>${gram(inF)} ก.</b></div><div><span>ทุนรวม</span><b>${money(cost)}</b></div></div>
+    <div class="grid2"><label>น้ำหนักก้อนใหม่ (ก.) *<input id="gw" inputmode="decimal" autofocus></label><label>% ที่วัดได้ *<input id="gp" inputmode="decimal"></label></div>
+    <label>ค่าหลอม (บาท)<input id="gc" inputmode="decimal" value="${esc(cfg.default_cost)}"></label>
+    <label>หมายเหตุ<input id="gn" placeholder="ไม่บังคับ"></label>
+    <div id="gcalc" class="melt-calc"></div>
+    <div class="row end"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button><button class="btn gold" id="gOk">บันทึกก้อนใหม่</button></div>`, { sticky: true });
+  const draw = () => { const w = num($('#gw').value), p = num($('#gp').value); if (!w || !p) { $('#gcalc').innerHTML = '<p class="muted sm">ใส่น้ำหนักและ % ของก้อนใหม่</p>'; return; }
+    const of = w * p / 100, diff = of - inF, dp = inF ? diff / inF * 100 : 0, ok = Math.abs(dp) <= num(cfg.tolerance_pct);
+    $('#gcalc').innerHTML = `<div class="mc-row"><span>น้ำหนักหาย</span><b>${gram(inW - w)} ก. (${inW ? ((inW - w) / inW * 100).toFixed(2) : 0}%)</b></div><div class="mc-row"><span>เนื้อทองก้อนใหม่</span><b>${gram(of)} ก.</b></div><div class="mc-row"><span>ต่างจากเนื้อรวมเดิม</span><b class="${ok ? 'okc' : 'bad'}">${diff >= 0 ? '+' : ''}${gram(diff)} ก. (${dp.toFixed(2)}%)</b></div><div class="mc-verdict ${ok ? 'ok' : 'bad'}">${ok ? '✅ อยู่ในเกณฑ์' : '⚠️ เกินเกณฑ์ — ควรวัดซ้ำ'}</div>`; };
+  ['#gw', '#gp'].forEach(id => { $(id).oninput = draw; }); draw();
+  $('#gOk').onclick = async (ev) => { busy(ev.target, true);
+    try { const m = await api('merge_melts', { p_token: S.session.token, p_melt_ids: list.map(x => x.id), p_out_weight: num($('#gw').value), p_measured_pct: num($('#gp').value), p_melt_cost: num($('#gc').value), p_note: $('#gn').value.trim() || null });
+      toast(`รวมเป็นก้อน ${m.lot_no} แล้ว`); ingotSel.clear(); closeModal(); renderStock(); }
+    catch (e) { busy(ev.target, false); toast(errText(e), 'err'); } };
+}
+async function sendModal() {
+  const list = ingotCache.filter(m => ingotSel.has(m.id));
+  const w = list.reduce((t, m) => t + num(m.out_weight), 0);
+  let known = [];
+  try { const r = await api('list_refinery', { p_token: S.session.token, p_scope: 'all' }); const seen = new Set(); known = r.filter(x => !seen.has(x.refinery_name) && seen.add(x.refinery_name)); } catch (e) { /* ignore */ }
+  modal(`<h2>ส่งโรงสกัด ${list.length} ก้อน</h2>
+    <p class="muted sm">${list.map(m => `${esc(m.lot_no)} (${gram(m.out_weight)} ก. @ ${esc(m.measured_pct)}%)`).join(', ')}</p>
+    <div class="grid2"><label>ชื่อโรงสกัด *<input id="rfName" list="rfList" autofocus></label><label>เบอร์โทร<input id="rfPhone" inputmode="tel"></label></div>
+    <datalist id="rfList">${known.map(k => `<option value="${esc(k.refinery_name)}">`).join('')}</datalist>
+    <div class="grid2"><label>น้ำหนักที่ส่ง (ก.)<input id="rfW" inputmode="decimal" value="${w}"></label><label>ค่าขนส่ง (บาท)<input id="rfT" inputmode="decimal" placeholder="0"></label></div>
+    <label>หมายเหตุ<input id="rfN" placeholder="ไม่บังคับ"></label>
+    <div class="row end"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button><button class="btn gold" id="rfOk">บันทึกการส่ง</button></div>`, { sticky: true });
+  $('#rfName').oninput = (e) => { const k = known.find(x => x.refinery_name === e.target.value); if (k && k.refinery_phone && !$('#rfPhone').value) $('#rfPhone').value = k.refinery_phone; };
+  $('#rfOk').onclick = async (ev) => { if (!$('#rfName').value.trim()) return toast('ใส่ชื่อโรงสกัด', 'err'); busy(ev.target, true);
+    try { const r = await api('send_refinery', { p_token: S.session.token, p_melt_ids: list.map(x => x.id), p_refinery: $('#rfName').value.trim(), p_phone: $('#rfPhone').value.trim(), p_sent_weight: num($('#rfW').value), p_transport: num($('#rfT').value), p_note: $('#rfN').value.trim() || null });
+      toast(`ส่งโรงสกัดแล้ว ล็อต ${r.lot_no}`); ingotSel.clear(); closeModal(); sellTab = 'refinery'; go('sell'); }
+    catch (e) { busy(ev.target, false); toast(errText(e), 'err'); } };
+}
+
+// ---------------------------------------------------------------- แท็บโรงสกัด (ในหน้าขาย)
+let refineryCache = [];
+async function refineryTabHtml() {
+  try { refineryCache = await api('list_refinery', { p_token: S.session.token, p_scope: S._refAll ? 'all' : 'open' }); } catch (e) { toast(errText(e), 'err'); refineryCache = []; }
+  const st = { sent: '<span class="pill warn">รอผลวิเคราะห์</span>', reported: '<span class="pill">ได้ผลแล้ว · รอสรุปขาย</span>', settled: '<span class="pill ok">สรุปขายแล้ว</span>', cancelled: '<span class="pill bad">ยกเลิก</span>' };
+  return `<div class="row"><p class="muted sm grow">ส่งก้อนไปโรงสกัดได้จากหน้า สต๊อก/หลอม → ก้อนหลอมแล้ว → ติ๊กเลือก → ส่งโรงสกัด</p><button class="btn ghost sm" id="refAll">${S._refAll ? 'ดูเฉพาะที่ยังไม่ปิด' : 'ดูทั้งหมด'}</button></div>
+    <div class="card list">${refineryCache.map((r, i) => `<button class="list-row ${r.status === 'cancelled' ? 'void' : ''}" data-lot="${i}"><div><b>${esc(r.lot_no)}</b> <span class="muted sm">${thDateTime(r.created_at)} · ${esc(r.staff_code || '')}</span><br>
+      <span class="sm">🏭 ${esc(r.refinery_name)} · ${(r.melts || []).map(m => esc(m.lot_no)).join(', ')} · ส่ง ${gram(r.sent_weight)} ก.${r.doc_count ? ' · 📎' + r.doc_count : ''}</span>
+      ${r.report ? `<br><span class="sm">ผล: ทอง <b>${esc(r.report.gold_pct)}%</b> (${gram(r.report.gold_g)} ก.) · เงิน <b>${esc(r.report.silver_pct)}%</b> (${gram(r.report.silver_g)} ก.)${(r.report.others || []).length ? ' · ' + r.report.others.map(o => `${esc(o.name)} ${esc(o.pct)}%`).join(', ') : ''}</span>` : ''}</div>
+      <div class="right">${st[r.status] || ''}<br><span class="muted sm">ทุน ${money(r.cost)}</span>${r.sale_no ? `<br><span class="muted sm">${esc(r.sale_no)}</span>` : ''}</div></button>`).join('') || '<p class="muted center-t">ไม่มีล็อตที่ส่งโรงสกัดค้างอยู่</p>'}</div>`;
+}
+function bindRefineryTab() {
+  const ra = $('#refAll'); if (ra) ra.onclick = () => { S._refAll = !S._refAll; renderSell(); };
+  $$('[data-lot]').forEach(b => b.onclick = () => lotDetail(refineryCache[+b.dataset.lot]));
+}
+async function lotDetail(r) {
+  let docs = []; try { docs = await api('list_lot_docs', { p_token: S.session.token, p_lot: r.id }); } catch (e) { /* ignore */ }
+  const rp = r.report, ourPct = num(r.our_weight) ? num(r.our_fine) / num(r.our_weight) * 100 : 0;
+  modal(`<h2>ล็อต ${esc(r.lot_no)} · 🏭 ${esc(r.refinery_name)}</h2>
+    <p class="muted">ส่งเมื่อ ${thDateTime(r.created_at)} โดย ${esc(r.staff_code || '')}${r.refinery_phone ? ' · โทร ' + esc(r.refinery_phone) : ''}${r.note ? ' · ' + esc(r.note) : ''}</p>
+    <div class="melt-sum"><div><span>ก้อนที่ส่ง</span><b>${(r.melts || []).length} ก้อน</b><small>${(r.melts || []).map(m => esc(m.lot_no)).join(', ')}</small></div>
+      <div><span>น้ำหนักส่ง</span><b>${gram(r.sent_weight)} ก.</b><small>เราวัด ${ourPct.toFixed(2)}% · เนื้อ ${gram(r.our_fine)} ก.</small></div>
+      <div><span>ทุน</span><b>${money(r.cost)}</b><small>ขนส่ง ${money(r.transport_cost)}</small></div>
+      <div><span>สถานะ</span><b>${{ sent: 'รอผล', reported: 'ได้ผลแล้ว', settled: 'ปิดแล้ว', cancelled: 'ยกเลิก' }[r.status]}</b><small>&nbsp;</small></div></div>
+    ${rp ? `<h3>ผลวิเคราะห์จากโรงสกัด</h3><table class="tbl sale-tbl"><thead><tr><th>ธาตุ</th><th>%</th><th>น้ำหนัก (ก.)</th></tr></thead><tbody>
+      <tr><td>ทอง</td><td><b>${esc(rp.gold_pct)}</b> <span class="muted sm">(เรา ${ourPct.toFixed(2)})</span></td><td>${gram(rp.gold_g)}</td></tr>
+      <tr><td>เงิน</td><td>${esc(rp.silver_pct)}</td><td>${gram(rp.silver_g)}</td></tr>
+      ${(rp.others || []).map(o => `<tr><td>${esc(o.name)}</td><td>${esc(o.pct)}</td><td>${gram(num(rp.weight) * num(o.pct) / 100)}</td></tr>`).join('')}
+      </tbody></table><p class="muted sm">น้ำหนักที่โรงสกัดชั่ง ${gram(rp.weight)} ก.${rp.report_date ? ' · รายงานวันที่ ' + esc(dueTh(rp.report_date)) : ''}</p>` : ''}
+    <h3>เอกสาร (${docs.length})</h3><div class="docs">${docs.map(d => `<button class="btn ghost sm" data-ldoc="${d.id}">📎 ${esc(d.name || 'เอกสาร')}</button>`).join('')}
+      ${r.status !== 'cancelled' ? '<label class="btn ghost sm">+ แนบรูปรายงาน<input type="file" id="lotDoc" accept="image/*" multiple hidden></label>' : ''}</div>
+    <div class="row end wrap"><button class="btn ghost" onclick="closeModal()">ปิด</button>
+      ${isOwner() && ['sent', 'reported'].includes(r.status) ? '<button class="btn ghost" id="lCancel">ยกเลิกการส่ง</button>' : ''}
+      ${['sent', 'reported'].includes(r.status) && canSell() ? `<button class="btn ${rp ? 'ghost' : 'gold'}" id="lReport">${rp ? 'แก้ผลวิเคราะห์' : 'บันทึกผลวิเคราะห์'}</button>` : ''}
+      ${r.status === 'reported' && canSell() ? '<button class="btn gold" id="lSettle">สรุปขาย</button>' : ''}</div>`, { wide: true });
+  $$('[data-ldoc]').forEach(b => b.onclick = async () => { try { const dc = await api('get_lot_doc', { p_token: S.session.token, p_doc: b.dataset.ldoc }); const w = window.open(); if (w) { w.document.title = dc.name || 'เอกสาร'; w.document.body.style.margin = 0; w.document.body.innerHTML = `<img src="${dc.data}" style="max-width:100%">`; } } catch (e) { toast(errText(e), 'err'); } });
+  const ld = $('#lotDoc'); if (ld) ld.onchange = async (e) => { for (const f of Array.from(e.target.files)) { try { await api('add_lot_doc', { p_token: S.session.token, p_lot: r.id, p_name: f.name.replace(/\.[^.]+$/, ''), p_data: await compressImage(f, 1600, 0.75) }); } catch (err) { toast(errText(err), 'err'); } } toast('แนบเอกสารแล้ว'); lotDetail(r); };
+  const lc = $('#lCancel'); if (lc) lc.onclick = async () => { const reason = prompt('เหตุผลที่ยกเลิกการส่ง ' + r.lot_no + ' (ก้อนจะกลับเข้าสต๊อก)'); if (!reason) return;
+    try { await api('cancel_refinery', { p_token: S.session.token, p_lot: r.id, p_reason: reason }); toast('ยกเลิกการส่งแล้ว ก้อนกลับเข้าสต๊อก'); closeModal(); renderSell(); } catch (e) { toast(errText(e), 'err'); } };
+  const lr = $('#lReport'); if (lr) lr.onclick = () => reportModal(r);
+  const ls = $('#lSettle'); if (ls) ls.onclick = () => settleModal(r);
+}
+function reportModal(r) {
+  const rp = r.report || {}; const others = (rp.others || []).slice(); if (!others.length) others.push({ name: '', pct: '' });
+  const drawOthers = () => others.map((o, i) => `<div class="grid2 other-row"><label>ธาตุอื่น<input data-on="${i}" value="${esc(o.name)}" placeholder="เช่น ทองแดง"></label><label>%<input data-op="${i}" inputmode="decimal" value="${esc(o.pct)}"></label></div>`).join('');
+  modal(`<h2>ผลวิเคราะห์ ล็อต ${esc(r.lot_no)}</h2>
+    <label>น้ำหนักที่โรงสกัดชั่ง (ก.)<input id="rpW" inputmode="decimal" value="${esc(rp.weight || r.sent_weight)}"></label>
+    <div class="grid2"><label>ทอง (%) *<input id="rpG" inputmode="decimal" value="${esc(rp.gold_pct || '')}" autofocus></label><label>เงิน (%)<input id="rpS" inputmode="decimal" value="${esc(rp.silver_pct || '')}"></label></div>
+    <div id="others">${drawOthers()}</div><button class="btn ghost sm" id="addOther">+ เพิ่มธาตุอื่น</button>
+    <label>วันที่ในรายงาน<input id="rpD" type="date" value="${esc(rp.report_date || bkkDate())}"></label>
+    <div id="rpCalc" class="melt-calc"></div>
+    <p class="muted sm">แนบรูปรายงานได้ที่หน้ารายละเอียดล็อต</p>
+    <div class="row end"><button class="btn ghost" id="rpBack">กลับ</button><button class="btn gold" id="rpOk">บันทึกผล</button></div>`, { sticky: true });
+  const collect = () => { $$('[data-on]').forEach(i => { others[+i.dataset.on].name = i.value; }); $$('[data-op]').forEach(i => { others[+i.dataset.op].pct = i.value; }); };
+  const calc = () => { const w = num($('#rpW').value), g = num($('#rpG').value), sv = num($('#rpS').value); collect(); const ot = others.reduce((t, o) => t + num(o.pct), 0);
+    const ourPct = num(r.our_weight) ? num(r.our_fine) / num(r.our_weight) * 100 : 0;
+    $('#rpCalc').innerHTML = g ? `<div class="mc-row"><span>เนื้อทอง</span><b>${gram(w * g / 100)} ก.</b></div><div class="mc-row"><span>เทียบที่เราวัด (${ourPct.toFixed(2)}%)</span><b class="${g >= ourPct ? 'okc' : 'bad'}">${(g - ourPct >= 0 ? '+' : '') + (g - ourPct).toFixed(2)}% · ${gram(w * g / 100 - num(r.our_fine))} ก.</b></div><div class="mc-row"><span>เนื้อเงิน</span><b>${gram(w * sv / 100)} ก.</b></div><div class="mc-row"><span>รวม %</span><b class="${g + sv + ot > 100.001 ? 'bad' : ''}">${(g + sv + ot).toFixed(2)}%</b></div>` : ''; };
+  const bindO = () => { $$('[data-on],[data-op]').forEach(i => { i.oninput = calc; }); };
+  $('#addOther').onclick = () => { collect(); others.push({ name: '', pct: '' }); $('#others').innerHTML = drawOthers(); bindO(); };
+  ['#rpW', '#rpG', '#rpS'].forEach(id => { $(id).oninput = calc; }); bindO(); calc();
+  $('#rpBack').onclick = () => lotDetail(r);
+  $('#rpOk').onclick = async (ev) => { collect(); busy(ev.target, true);
+    try { await api('save_refinery_report', { p_token: S.session.token, p_lot: r.id, p_report: { weight: num($('#rpW').value), gold_pct: num($('#rpG').value), silver_pct: num($('#rpS').value), others: others.filter(o => o.name.trim() && num(o.pct)).map(o => ({ name: o.name.trim(), pct: num(o.pct) })), report_date: $('#rpD').value } });
+      toast('บันทึกผลวิเคราะห์แล้ว'); closeModal(); renderSell(); }
+    catch (e) { busy(ev.target, false); toast(errText(e), 'err'); } };
+}
+function settleModal(r) {
+  const rp = r.report, goldG = num(rp.gold_g), silverG = num(rp.silver_g);
+  const goldPriceDefault = (() => { const t = tiersFor('gold').find(x => x.pct === 96.5); return t ? Math.round(t.price / 0.965) : ''; })();
+  modal(`<h2>สรุปขาย ล็อต ${esc(r.lot_no)}</h2>
+    <p class="muted sm">🏭 ${esc(r.refinery_name)} · ทอง ${gram(goldG)} ก. (${esc(rp.gold_pct)}%) · เงิน ${gram(silverG)} ก. (${esc(rp.silver_pct)}%)</p>
+    <div class="card"><h3>ทอง</h3><div class="grid2"><label>ราคาต่อกรัมเนื้อทอง (บาท)<input id="stGP" inputmode="decimal" value="${esc(goldPriceDefault)}"></label><label>ยอดขายทอง (บาท) *<input id="stGA" inputmode="decimal"></label></div></div>
+    ${silverG > 0 ? `<div class="card"><h3>แร่เงิน ${gram(silverG)} ก.</h3>
+      <div class="seg"><button data-sact="sell">ขายพร้อมทอง</button><button data-sact="return" class="on">รับแร่เงินคืน (เก็บไว้ขายทีหลัง)</button></div>
+      <div id="sSell" style="display:none" class="grid2"><label>ราคาต่อกรัม (บาท)<input id="stSP" inputmode="decimal"></label><label>ยอดขายเงิน (บาท)<input id="stSA" inputmode="decimal"></label></div>
+      <div id="sRet" class="grid2"><label>น้ำหนักแร่เงินที่รับคืน (ก.)<input id="stRG" inputmode="decimal" value="${silverG}"></label><label>ทุนที่แบ่งให้แร่เงิน (บาท)<input id="stRC" inputmode="decimal" value="0"></label></div>
+      <p class="muted sm" id="sRetNote">แร่เงินที่รับคืนจะเข้าสต๊อกเป็นก้อน ${esc(r.lot_no)}-AG ขายได้ภายหลังที่หน้าขาย · ทุนที่แบ่งให้จะถูกหักออกจากทุนของทองในล็อตนี้</p></div>` : ''}
+    <div class="card"><h3>ค่าใช้จ่ายที่โรงสกัดหัก</h3><div class="grid2"><label>ค่าสกัด (บาท)<input id="stFee" inputmode="decimal" placeholder="0"></label><label>ค่าใช้จ่ายอื่น (บาท)<input id="stOth" inputmode="decimal" placeholder="0"></label></div>
+      <p class="muted sm" id="feeHint"></p></div>
+    <div class="seg"><button data-spaid="1">ได้รับเงินแล้ว</button><button data-spaid="0" class="on">รอรับเงิน</button></div>
+    <div class="grid2"><label>ช่องทาง<select id="stM"><option value="transfer">โอน</option><option value="cash">เงินสด</option><option value="cheque">เช็ค</option></select></label><label id="stDueL">กำหนดรับเงิน<input id="stDue" type="date" min="${bkkDate()}"></label></div>
+    <div class="sell-total" id="stTot"></div>
+    <div class="row end"><button class="btn ghost" id="stBack">กลับ</button><button class="btn gold" id="stOk">บันทึกสรุปขาย</button></div>`, { sticky: true, wide: true });
+  let sact = 'return', paid = false, gaEdited = false, saEdited = false;
+  const tot = () => {
+    const gp = num($('#stGP').value); if (!gaEdited && gp) $('#stGA').value = Math.floor(goldG * gp);
+    const sp = $('#stSP') ? num($('#stSP').value) : 0; if ($('#stSA') && !saEdited && sp) $('#stSA').value = Math.floor(silverG * sp);
+    const ga = num($('#stGA').value), sa = sact === 'sell' && $('#stSA') ? num($('#stSA').value) : 0, scost = sact === 'return' && $('#stRC') ? Math.min(num($('#stRC').value), num(r.cost)) : 0;
+    const fees = num($('#stFee').value) + num($('#stOth').value) + num(r.transport_cost), cost = num(r.cost) - scost, profit = ga + sa - cost - fees;
+    $('#feeHint').textContent = num($('#stFee').value) ? `= ${money(num($('#stFee').value) / (num(rp.weight) || 1), 2)} บาท/กรัม (ตามน้ำหนัก ${gram(rp.weight)} ก.)` : '';
+    $('#stTot').innerHTML = `<div><span>ขายทอง${sa ? '+เงิน' : ''}</span><b>${money(ga + sa)}</b></div><div><span>ทุน${scost ? ' (หักส่วนแร่เงิน)' : ''}</span><b>${money(cost)}</b></div><div><span>ค่าสกัด+ขนส่ง+อื่นๆ</span><b>${money(fees)}</b></div><div><span>กำไรสุทธิ</span><b class="${profit >= 0 ? 'okc' : 'bad'}">${money(profit)}</b></div>`;
+  };
+  $('#stGA').oninput = () => { gaEdited = true; tot(); };
+  ['#stGP', '#stFee', '#stOth'].forEach(id => { $(id).oninput = tot; });
+  ['#stSP', '#stRC', '#stRG'].forEach(id => { const el = $(id); if (el) el.oninput = tot; });
+  const sa = $('#stSA'); if (sa) sa.oninput = () => { saEdited = true; tot(); };
+  $$('[data-sact]').forEach(b => b.onclick = () => { sact = b.dataset.sact; $$('[data-sact]').forEach(x => x.classList.toggle('on', x === b)); $('#sSell').style.display = sact === 'sell' ? '' : 'none'; $('#sRet').style.display = sact === 'return' ? '' : 'none'; $('#sRetNote').style.display = sact === 'return' ? '' : 'none'; tot(); });
+  $$('[data-spaid]').forEach(b => b.onclick = () => { paid = b.dataset.spaid === '1'; $$('[data-spaid]').forEach(x => x.classList.toggle('on', x === b)); $('#stDueL').style.display = paid ? 'none' : ''; });
+  tot();
+  $('#stBack').onclick = () => lotDetail(r);
+  $('#stOk').onclick = async (ev) => {
+    if (!num($('#stGA').value)) return toast('ใส่ยอดขายทอง', 'err');
+    if (sact === 'sell' && silverG > 0 && !num($('#stSA').value) && !confirm('ยังไม่ได้ใส่ยอดขายแร่เงิน บันทึกต่อไหม?')) return;
+    busy(ev.target, true);
+    try {
+      const res = await api('settle_refinery', { p_token: S.session.token, p_lot: r.id, p_s: { gold_price_g: num($('#stGP').value) || null, gold_amount: num($('#stGA').value), silver_action: silverG > 0 ? sact : 'none',
+        silver_price_g: $('#stSP') ? num($('#stSP').value) || null : null, silver_amount: $('#stSA') ? num($('#stSA').value) : 0, silver_return_g: $('#stRG') ? num($('#stRG').value) : null, silver_cost: $('#stRC') ? num($('#stRC').value) : 0,
+        refine_fee: num($('#stFee').value), other_cost: num($('#stOth').value), paid, pay_method: $('#stM').value, due_date: paid ? null : ($('#stDue').value || null) } });
+      toast(`สรุปขายแล้ว ${res.sale_no}${res.returned_lot ? ' · แร่เงินเข้าสต๊อก ' + res.returned_lot : ''}`); closeModal(); sellTab = paid ? 'history' : 'pending'; renderSell();
+    } catch (e) { busy(ev.target, false); toast(errText(e), 'err'); }
+  };
+}
+
 // ---------------------------------------------------------------- customers
 function renderCustomers() {
   shell('ลูกค้า', `<div class="card"><input id="cq" placeholder="ค้นหา: เลขบัตร / เบอร์ / ชื่อ / เลขบิล" autofocus><div id="cres" class="list"></div></div>`);
@@ -968,6 +1435,7 @@ async function customerDetail(c) {
 // ---------------------------------------------------------------- more
 function renderMore() {
   const items = [
+    ['customers', 'ลูกค้า (ค้นหา / ประวัติ)', 'ทุกคน'],
     ['pin', 'เปลี่ยน PIN / ชื่อเล่นของฉัน', 'ทุกคน'],
     ...(isOwner() ? [['requests', `คำขอยกเลิกบิล${S.pendingReq ? ' 🔴 ' + S.pendingReq : ''}`, 'เจ้าของ'], ['todayprice', 'ตั้งราคาวันนี้ / เปลี่ยนราคาระหว่างวัน', 'เจ้าของ'], ['settings', 'ตั้งค่าราคา & ร้าน', 'เจ้าของ'], ['staff', 'จัดการพนักงาน', 'เจ้าของ'], ['audit', 'ประวัติการใช้งาน (ตรวจสอบ)', 'เจ้าของ']] : [])
   ];
@@ -1009,7 +1477,7 @@ let setTab = 'prices';
 function renderSettings() {
   if (!isOwner()) return go('buy');
   const st = deepCopy(S.settings), P = st.prices, shop = st.shop, rc = st.receipt || {};
-  const tabs = [['prices', 'ราคา'], ['shop', 'ข้อมูลร้าน'], ['receipt', 'ใบรับซื้อ'], ['cancel', 'ยกเลิกบิล']];
+  const tabs = [['prices', 'ราคา'], ['shop', 'ข้อมูลร้าน'], ['receipt', 'ใบรับซื้อ'], ['cancel', 'ยกเลิกบิล'], ['melt', 'หลอม'], ['sale', 'ขาย']];
   let body = '';
   if (setTab === 'prices') {
     body = `<div class="card">
@@ -1031,6 +1499,20 @@ function renderSettings() {
       <div class="logo-up">${shop.logo ? `<img src="${shop.logo}" alt="">` : '<span class="logo xl">DD</span>'}<div><label class="btn ghost sm">อัปโหลดโลโก้<input type="file" id="logo" accept="image/*" hidden></label>${shop.logo ? '<button class="btn ghost sm" id="rmLogo">ลบโลโก้</button>' : ''}<p class="muted sm">ใช้บนหน้าจอและใบรับซื้อ (ขาวดำจะชัดที่สุด)</p></div></div>
       ${[['name', 'ชื่อร้าน'], ['name2', 'ชื่อรอง'], ['branch', 'สาขา'], ['address', 'ที่อยู่'], ['phone', 'โทร'], ['line', 'LINE'], ['footer', 'ข้อความท้ายใบ']].map(([f, l]) => `<label>${l}<input data-shop="${f}" value="${esc(shop[f] || '')}"></label>`).join('')}
       <button class="btn gold block" id="saveShop">บันทึกข้อมูลร้าน</button></div>`;
+  } else if (setTab === 'sale') {
+    const sc = saleCfg();
+    body = `<div class="card"><div class="card-h"><h2>สิทธิ์การขาย</h2></div>
+      <label class="switch"><input type="checkbox" id="slStaff" ${sc.staff_can_sell ? 'checked' : ''}> <b>อนุญาตให้พนักงานบันทึกการขายและรับเงิน</b></label>
+      <p class="muted sm">ปิดไว้ = บันทึกการขายได้เฉพาะเจ้าของ · ยกเลิกการขายได้เฉพาะเจ้าของเสมอ</p>
+      <button class="btn gold block" id="saveSl">บันทึก</button></div>`;
+  } else if (setTab === 'melt') {
+    const m = meltCfg();
+    body = `<div class="card"><div class="card-h"><h2>ค่าตั้งต้นการหลอม</h2></div>
+      <label>ค่าหลอมเริ่มต้นต่อครั้ง (บาท)<input id="mCost" inputmode="decimal" value="${esc(m.default_cost)}"></label>
+      <label>เกณฑ์ที่รับได้: เนื้อทองจริงต่างจากที่คาดไม่เกิน (±%)<input id="mTol" inputmode="decimal" value="${esc(m.tolerance_pct)}"></label>
+      <p class="muted sm">ตัวอย่าง 0.5 = ถ้าคาดว่าได้เนื้อทอง 100 ก. แล้ววัดได้ 99.5–100.5 ก. ถือว่าอยู่ในเกณฑ์ พร้อมขาย</p>
+      <label>เตือนเมื่อน้ำหนักหายตอนหลอมเกิน (%)<input id="mLoss" inputmode="decimal" value="${esc(m.loss_warn_pct)}"></label>
+      <button class="btn gold block" id="saveM">บันทึก</button></div>`;
   } else if (setTab === 'cancel') {
     const c = cancelCfg();
     body = `<div class="card">
@@ -1077,6 +1559,10 @@ function renderSettings() {
     $('#logo').onchange = async (ev) => { const f = ev.target.files[0]; if (!f) return; shop.logo = await resizeImage(f, 240); save('shop', shop, null); };
     const rl = $('#rmLogo'); if (rl) rl.onclick = () => { shop.logo = null; save('shop', shop, null); };
     $('#saveShop').onclick = (ev) => { $$('[data-shop]').forEach(i => { shop[i.dataset.shop] = i.value.trim(); }); save('shop', shop, ev.target); };
+  } else if (setTab === 'sale') {
+    $('#saveSl').onclick = (ev) => save('sale', { staff_can_sell: $('#slStaff').checked }, ev.target);
+  } else if (setTab === 'melt') {
+    $('#saveM').onclick = (ev) => save('melt', { default_cost: Math.max(0, num($('#mCost').value)), tolerance_pct: Math.max(0, num($('#mTol').value)), loss_warn_pct: Math.max(0, num($('#mLoss').value)) }, ev.target);
   } else if (setTab === 'cancel') {
     $('#cEn').onchange = (e) => { const o = $('#cOpts'); o.style.opacity = e.target.checked ? '' : '.45'; o.style.pointerEvents = e.target.checked ? '' : 'none'; };
     $('#saveC').onclick = (ev) => save('cancel', { enabled: $('#cEn').checked, limit: Math.max(0, num($('#cLim').value)), today_only: $('#cToday').checked }, ev.target);
@@ -1115,7 +1601,7 @@ async function renderAudit() {
   shell('ประวัติการใช้งาน', '<div class="center"><span class="spin big"></span></div>');
   let rows = [];
   try { rows = await api('list_audit', { p_token: S.session.token, p_from: auditDate, p_to: auditDate }); } catch (e) { toast(errText(e), 'err'); }
-  const A = { login: 'เข้าระบบ', logout: 'ออกจากระบบ', pin_wrong: '⚠ ใส่ PIN ผิด', create_bill: 'ทำบิลรับซื้อ', void_bill: '⚠ ยกเลิกบิล', request_cancel: 'ขอยกเลิกบิล', reject_cancel: 'ไม่อนุมัติคำขอยกเลิก', withdraw_cancel: 'ถอนคำขอยกเลิก', save_setting: 'แก้การตั้งค่า', add_staff: 'เพิ่มพนักงาน', reset_pin: 'รีเซ็ต PIN', set_staff_active: 'เปิด/ปิดพนักงาน', change_pin: 'เปลี่ยน PIN', set_nickname: 'เปลี่ยนชื่อเล่น', register_device: 'ลงทะเบียนเครื่อง', setup_owner: 'ตั้งค่าร้าน' };
+  const A = { login: 'เข้าระบบ', logout: 'ออกจากระบบ', pin_wrong: '⚠ ใส่ PIN ผิด', create_bill: 'ทำบิลรับซื้อ', void_bill: '⚠ ยกเลิกบิล', create_melt: 'หลอมก้อน', create_sale: 'บันทึกการขาย', merge_melts: 'รวมก้อน', send_refinery: 'ส่งโรงสกัด', refinery_report: 'บันทึกผลวิเคราะห์', settle_refinery: 'สรุปขายโรงสกัด', cancel_refinery: '⚠ ยกเลิกการส่งโรงสกัด', sale_paid: 'รับเงินจากการขาย', cancel_sale: '⚠ ยกเลิกการขาย', add_sale_doc: 'แนบเอกสารขาย', cancel_melt: '⚠ ยกเลิกการหลอม', request_cancel: 'ขอยกเลิกบิล', reject_cancel: 'ไม่อนุมัติคำขอยกเลิก', withdraw_cancel: 'ถอนคำขอยกเลิก', save_setting: 'แก้การตั้งค่า', add_staff: 'เพิ่มพนักงาน', reset_pin: 'รีเซ็ต PIN', set_staff_active: 'เปิด/ปิดพนักงาน', change_pin: 'เปลี่ยน PIN', set_nickname: 'เปลี่ยนชื่อเล่น', register_device: 'ลงทะเบียนเครื่อง', setup_owner: 'ตั้งค่าร้าน' };
   $('.main').innerHTML = `<h1 class="screen-title">ประวัติ <input type="date" id="adate" value="${auditDate}" max="${bkkDate()}"></h1>
     <div class="card list">${rows.map(r => `<div class="list-row ${/wrong|void/.test(r.action) ? 'warnrow' : ''}"><div><b>${esc(A[r.action] || r.action)}</b> <span class="muted sm">${esc(r.staff_code || '')} · เครื่อง ${esc(r.device_id || '-')}</span><br><span class="sm muted">${esc(r.detail ? Object.entries(r.detail).filter(([k, v]) => k !== 'value' && v != null).map(([k, v]) => `${k}: ${typeof v === 'object' ? '…' : v}`).join(' · ') : '')}</span></div><span class="muted sm">${thTime(r.at)}</span></div>`).join('') || '<p class="muted">ไม่มีรายการ</p>'}</div>`;
   $('#adate').onchange = (e) => { auditDate = e.target.value; renderAudit(); };

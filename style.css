@@ -195,3 +195,40 @@ h2{font-size:18px}
 .req{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;flex-direction:column;gap:4px}
 .req-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .req-reason{background:var(--warn-l);border-radius:8px;padding:8px 10px;font-size:14px;margin-top:4px}
+
+.stock-row{display:flex;flex-direction:row;gap:10px;align-items:center;padding:10px 6px;border-bottom:1px solid var(--line);cursor:pointer;font-size:15px;color:var(--ink);margin:0}
+.stock-row input{width:22px;height:22px;flex:none}
+.stock-row.on{background:#FFFBEF}
+.melt-bar{position:sticky;bottom:72px;z-index:10;display:none;align-items:center;justify-content:space-between;gap:12px;background:var(--ink);color:#fff;border-radius:14px;padding:12px 14px;margin-top:10px;box-shadow:0 6px 24px rgba(0,0,0,.2)}
+.melt-bar.show{display:flex} .melt-bar .sm{color:#D9CFB8}
+.melt-sum{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:10px 0}
+.melt-sum div{background:var(--bg);border-radius:10px;padding:10px;display:flex;flex-direction:column}
+.melt-sum span{font-size:12px;color:var(--muted)} .melt-sum b{font-size:18px} .melt-sum small{font-size:12px;color:var(--muted)}
+.melt-calc{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px}
+.mc-row{display:flex;justify-content:space-between;padding:4px 0;font-size:15px}
+.mc-verdict{border-radius:10px;padding:8px 10px;margin:6px 0;font-weight:700;font-size:14px}
+.mc-verdict.ok{background:var(--ok-l);color:var(--ok)} .mc-verdict.bad{background:var(--bad-l);color:var(--bad)}
+.okc{color:var(--ok)}
+.bottomnav .tab span{font-size:11px}
+@media (min-width:900px){ .melt-bar{bottom:16px} .melt-sum{grid-template-columns:repeat(4,1fr)} }
+.seg button{height:auto;min-height:42px;padding:6px 6px;line-height:1.25}
+@media (max-width:480px){ .seg button{font-size:13px} }
+
+.sell-item{border-bottom:1px solid var(--line)} .sell-item.on{background:#FFFBEF}
+.sell-item .stock-row{border-bottom:0}
+.sell-in{padding:0 8px 10px 38px;align-items:end}
+.sell-calc{display:flex;flex-direction:column;font-size:13px;padding-bottom:8px}
+.sell-total{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:12px 0}
+.sell-total div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column}
+.sell-total span{font-size:12px;color:var(--muted)} .sell-total b{font-size:20px}
+.sale-tbl td,.sale-tbl th{font-size:13px;vertical-align:top;border-top:1px solid var(--line);padding:6px 4px}
+.docs{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+@media (min-width:900px){ .sell-total{grid-template-columns:repeat(4,1fr)} }
+@media (max-width:480px){ .sell-in{padding-left:8px} .sell-in.grid3{grid-template-columns:1fr 1fr} .sell-calc{grid-column:1/-1} }
+
+.ingot-pick{display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--line)} .ingot-pick.on{background:#FFFBEF}
+.ingot-pick input{width:22px;height:22px;flex:none;margin-left:6px}
+.ingot-pick .list-row{border-bottom:0}
+.other-row label{margin:4px 0}
+.modal .card{box-shadow:none;padding:12px;margin-bottom:10px}
+.modal .card h3{margin-bottom:4px}
