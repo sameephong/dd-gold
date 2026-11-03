@@ -232,3 +232,37 @@ h2{font-size:18px}
 .other-row label{margin:4px 0}
 .modal .card{box-shadow:none;padding:12px;margin-bottom:10px}
 .modal .card h3{margin-bottom:4px}
+
+/* สรุปวันนี้ */
+
+.flow{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px}
+.flow .kpi b{font-size:22px}
+.kpi.in{background:#E6F4EC;border-color:#BFE3CD} .kpi.in b{color:#1D7A46}
+.kpi.out{background:#FDECEA;border-color:#F5C6C1} .kpi.out b{color:#B42318}
+.kpi.wait{background:#FFF3DB;border-color:#F3D9A4} .kpi.wait b{color:#9A5B00}
+.kpi.cash{background:#1E1B16;border-color:#1E1B16;color:#fff} .kpi.cash b{color:#C9A227} .kpi.cash span,.kpi.cash small{color:#D9CFB8}
+.flow .kpi.in span,.flow .kpi.in small{color:#4C6B57}
+.addnote{display:block}
+.two{display:grid;grid-template-columns:1fr;gap:14px}
+.brk{width:100%;border-collapse:collapse;font-size:15px}
+.brk td{padding:8px 4px;border-bottom:1px solid var(--line)} .brk td:last-child{text-align:right;font-weight:700;white-space:nowrap}
+.brk tr.tot td{border-bottom:0;font-size:17px} .brk .sub{color:var(--muted);font-size:13px;font-weight:400}
+.in-t{color:#1D7A46} .out-t{color:#B42318}
+.wait-row{display:flex;justify-content:space-between;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line);font-size:15px}
+.wait-row .right{text-align:right}
+.tl{display:flex;gap:12px;padding:12px 4px;border-bottom:1px solid var(--line)}
+.tl .ic{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;flex:none}
+.ic.buy{background:#FDECEA} .ic.sell{background:#E6F4EC} .ic.pay{background:#E6F4EC} .ic.ref{background:#EAF1FA} .ic.void{background:#EFEBE3}
+.tl .body{flex:1;min-width:0} .tl .amt{text-align:right;white-space:nowrap;font-weight:700}
+.note{background:#FFFBEF;border:1px solid #F3E2B0;border-radius:10px;padding:7px 10px;margin-top:6px;font-size:13px}
+.note b{color:#8A6100}
+.addnote{border:0;background:none;color:#1F5FAF;font-weight:600;font-size:13px;padding:4px 0;cursor:pointer}
+.filter{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 4px}
+.filter button{height:34px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:#fff;font-weight:600;font-size:13px}
+.filter button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.tag{font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;background:#EFEBE3;color:#5E584E;margin-left:4px}
+@media (min-width:900px){ .flow{grid-template-columns:repeat(5,1fr)} .two{grid-template-columns:1fr 1fr} }
+
+.linkish{border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left}
+.linkish:hover b{text-decoration:underline}
+.wait-row{cursor:pointer}
