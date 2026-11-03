@@ -187,3 +187,11 @@ h2{font-size:18px}
 .choice b{font-size:17px} .choice span{font-size:13px;color:var(--muted)}
 .choice:hover{border-color:var(--gold);background:#FFFBEF}
 .banner.info{background:var(--blue-l);color:#17457F}
+.assoc{width:100%;border-collapse:collapse;margin:6px 0;font-size:15px} .assoc th{font-size:13px;color:var(--muted);text-align:right;padding:6px} .assoc th:first-child{text-align:left} .assoc td{padding:8px 6px;border-top:1px solid var(--line);text-align:right} .assoc td:first-child{text-align:left}
+
+.tab{position:relative}
+.badge{position:absolute;top:4px;right:calc(50% - 22px);min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--bad);color:#fff;font-size:11px;font-style:normal;font-weight:700;display:flex;align-items:center;justify-content:center}
+.topnav .badge{top:2px;right:2px}
+.req{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;flex-direction:column;gap:4px}
+.req-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.req-reason{background:var(--warn-l);border-radius:8px;padding:8px 10px;font-size:14px;margin-top:4px}

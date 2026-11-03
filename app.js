@@ -4,7 +4,7 @@
 'use strict';
 const CFG = window.DD_CONFIG || {};
 const DEMO = !CFG.SUPABASE_URL;
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 
 // ---------------------------------------------------------------- utils
 const $ = (s, el = document) => el.querySelector(s);
@@ -39,7 +39,7 @@ const ERR = {
   PIN_WRONG: 'PIN ไม่ถูกต้อง', DEVICE_INVALID: 'เครื่องนี้ยังไม่ได้ลงทะเบียน หรือถูกยกเลิกแล้ว', SESSION_INVALID: 'หมดเวลาเข้าระบบ กรุณาเข้าระบบใหม่',
   OWNER_ONLY: 'เฉพาะเจ้าของเท่านั้น', PIN_WEAK: 'PIN ง่ายเกินไป เลือกตัวเลขอื่น', PIN_FORMAT: 'PIN ต้องเป็นตัวเลข 4 หลัก (เจ้าของ 6 หลัก)', PIN_FORMAT_6: 'PIN เจ้าของต้องเป็นตัวเลข 6 หลัก',
   ALREADY_SETUP: 'ร้านนี้ตั้งค่าเจ้าของไปแล้ว', CUSTOMER_REQUIRED: 'ต้องมีเลขบัตรประชาชนผู้ขาย', WRONG_BRANCH: 'พนักงานไม่ได้อยู่สาขานี้', CANNOT_SELF: 'ปิดบัญชีตัวเองไม่ได้',
-  NOT_FOUND: 'ไม่พบบิล หรือบิลถูกยกเลิกไปแล้ว', REASON_REQUIRED: 'ต้องใส่เหตุผลที่ยกเลิก', STAFF_CANCEL_OFF: 'เจ้าของปิดฟังก์ชันให้พนักงานยกเลิกบิลไว้', BILL_NOT_TODAY: 'พนักงานยกเลิกได้เฉพาะบิลของวันนี้', NEED_OWNER: 'บิลนี้เกินวงเงิน ต้องให้เจ้าของใส่ PIN อนุมัติ', NET: 'ไม่มีอินเทอร์เน็ต', OFFLINE_LOGIN: 'เครื่องนี้ยังไม่เคยเข้าระบบด้วยรหัสนี้ตอนออนไลน์ จึงเข้าแบบออฟไลน์ไม่ได้'
+  NOT_FOUND: 'ไม่พบบิล หรือบิลถูกยกเลิกไปแล้ว', REASON_REQUIRED: 'ต้องใส่เหตุผลที่ยกเลิก', STAFF_CANCEL_OFF: 'เจ้าของปิดฟังก์ชันให้พนักงานยกเลิกบิลไว้', BILL_NOT_TODAY: 'พนักงานยกเลิกได้เฉพาะบิลของวันนี้', NEED_OWNER: 'บิลนี้เกินวงเงิน ต้องให้เจ้าของอนุมัติ', REQUEST_DONE: 'คำขอนี้ถูกตัดสินไปแล้ว', NET: 'ไม่มีอินเทอร์เน็ต', OFFLINE_LOGIN: 'เครื่องนี้ยังไม่เคยเข้าระบบด้วยรหัสนี้ตอนออนไลน์ จึงเข้าแบบออฟไลน์ไม่ได้'
 };
 const errText = (e) => { const m = (e && e.message) || String(e); if (m.startsWith('LOCKED:')) return `ใส่ PIN ผิดหลายครั้ง ล็อกไว้ ${m.split(':')[1]} นาที`; return ERR[m] || m; };
 const isNet = (e) => e && (e.net || e.name === 'TypeError' || e.name === 'AbortError');
@@ -185,14 +185,16 @@ const icon = (d) => `<svg viewBox="0 0 24 24" width="22" height="22" fill="none"
 
 function shell(title, body) {
   const shop = (S.settings && S.settings.shop) || {};
-  const tabs = NAV.map(n => `<button class="tab ${S.screen === n.id || (n.id === 'more' && ['more', 'settings', 'staff', 'audit', 'pin'].includes(S.screen)) ? 'active' : ''}" data-go="${n.id}">${icon(n.icon)}<span>${n.label}</span></button>`).join('');
+  const badge = (id) => id === 'more' && isOwner() && S.pendingReq ? `<i class="badge">${S.pendingReq}</i>` : '';
+  const tabs = NAV.map(n => `<button class="tab ${S.screen === n.id || (n.id === 'more' && ['more', 'settings', 'staff', 'audit', 'pin', 'requests'].includes(S.screen)) ? 'active' : ''}" data-go="${n.id}">${icon(n.icon)}<span>${n.label}</span>${badge(n.id)}</button>`).join('');
+  const reqBanner = isOwner() && S.pendingReq && S.screen !== 'requests' ? `<div class="banner warn">⚠️ มีคำขอยกเลิกบิลรออนุมัติ ${S.pendingReq} รายการ <button class="btn sm" data-go="requests">ดู / อนุมัติ</button></div>` : '';
   $('#app').innerHTML = `
   <header class="appbar">
     <div class="brand">${shop.logo ? `<img src="${shop.logo}" alt="">` : '<span class="logo">DD</span>'}<div><b>${esc(shop.name || 'DD หลอมทอง')}</b><small>${esc(shop.branch || '')}${DEMO ? ' · <em>โหมดทดลอง</em>' : ''}</small></div></div>
     <nav class="topnav">${tabs}</nav>
     <div class="who"><button id="status" class="status"></button><span class="chip">${esc(me().code)} · ${esc(me().nickname)}</span><button class="btn ghost sm" id="logoutBtn">ออก</button></div>
   </header>
-  <main class="main"><h1 class="screen-title">${title}</h1>${body}</main>
+  <main class="main">${reqBanner}<h1 class="screen-title">${title}</h1>${body}</main>
   <nav class="bottomnav">${tabs}</nav>`;
   $$('[data-go]').forEach(b => b.onclick = () => go(b.dataset.go));
   $('#logoutBtn').onclick = logout;
@@ -205,7 +207,7 @@ function go(screen) {
   if (me().must_change_pin && screen !== 'pin') screen = 'pin';
   S.screen = screen;
   window.scrollTo(0, 0);
-  ({ buy: renderBuy, bills: renderBills, customers: renderCustomers, more: renderMore, settings: renderSettings, staff: renderStaff, audit: renderAudit, pin: renderPin }[screen] || renderBuy)();
+  ({ buy: renderBuy, bills: renderBills, customers: renderCustomers, more: renderMore, settings: renderSettings, staff: renderStaff, audit: renderAudit, pin: renderPin, requests: renderRequests }[screen] || renderBuy)();
   // เจ้าของเข้าระบบวันแรกของวัน และยังไม่ได้ตั้งราคาวันนี้ → ถามว่าจะใช้ราคาแบบไหน
   if (isOwner() && S.session.token && screen !== 'pin' && S.settings && S.settings.prices && S.settings.prices.date !== bkkDate() && S.priceAsked !== bkkDate()) {
     S.priceAsked = bkkDate(); setTimeout(dailyPriceModal, 200);
@@ -315,7 +317,8 @@ async function boot() {
   }
   if (sessionValid()) {
     if (S.session.token) api('get_settings', { p_token: S.session.token }).then(r => { applySettings(r.settings, r.server_time); }).catch(e => { if (e.message === 'SESSION_INVALID') sessionExpired(); });
-    return go(isOwner() ? 'bills' : 'buy');
+    setTimeout(pollPending, 1500);
+    return go(isOwner() && location.hash === '#requests' ? 'requests' : (isOwner() ? 'bills' : 'buy'));
   }
   renderLogin();
 }
@@ -408,7 +411,8 @@ async function doLogin() {
     saveSession({ token: r.token, staff: r.staff, login_at: Date.now() });
     toast(`สวัสดี ${r.staff.nickname}`);
     syncNow();
-    go(r.staff.must_change_pin ? 'pin' : (r.staff.role === 'owner' ? 'bills' : 'buy'));
+    setTimeout(pollPending, 800);
+    go(r.staff.must_change_pin ? 'pin' : (r.staff.role === 'owner' ? (location.hash === '#requests' ? 'requests' : 'bills') : 'buy'));
   } catch (e) {
     if (isNet(e)) {
       if (await verifyLocal(code, pin)) {
@@ -785,7 +789,7 @@ async function renderBills() {
   const byMetal = {}; ok.forEach(b => b.items.forEach(it => { const k = it.metal; byMetal[k] = byMetal[k] || { w: 0, a: 0 }; byMetal[k].w += num(it.weight); byMetal[k].a += num(it.amount); }));
   const byPct = {}; ok.forEach(b => b.items.filter(i => i.metal === 'gold').forEach(it => { byPct[it.pct] = (byPct[it.pct] || 0) + num(it.weight); }));
   const M = metals();
-  $('.main').innerHTML = `<h1 class="screen-title">สรุป <input type="date" id="bdate" value="${S.billsDate}" max="${bkkDate()}"></h1>
+  $('.main').innerHTML = `${isOwner() && S.pendingReq ? `<div class="banner warn">⚠️ มีคำขอยกเลิกบิลรออนุมัติ ${S.pendingReq} รายการ <button class="btn sm" id="goReq">ดู / อนุมัติ</button></div>` : ''}<h1 class="screen-title">สรุป <input type="date" id="bdate" value="${S.billsDate}" max="${bkkDate()}"></h1>
     ${!fromServer && S.session.token ? '' : ''}
     ${!fromServer ? '<div class="banner warn">ออฟไลน์ — แสดงเฉพาะบิลที่ทำในเครื่องนี้</div>' : ''}
     <div class="kpis">
@@ -798,8 +802,9 @@ async function renderBills() {
     <div class="card"><div class="card-h"><h2>บิลรับซื้อ</h2>${S.pending ? `<button class="btn sm" id="syncBtn">ส่งบิลค้าง ${S.pending}</button>` : ''}</div>
     <div class="list">${bills.map(b => `<button class="list-row bill ${b.status === 'void' ? 'void' : ''}" data-id="${b.id}">
       <div><b>${esc(b.bill_no)}</b> <span class="muted sm">${thTime(b.created_at)} · ${esc(b.staff_code || '')}</span><br><span class="sm">${esc((b.customer || {}).name || '')}</span></div>
-      <div class="right"><b>${money(b.total)}</b><br>${b.status === 'void' ? '<span class="pill bad">ยกเลิก</span>' : b.synced ? '<span class="pill ok">ส่งแล้ว</span>' : b.error ? `<span class="pill bad" title="${esc(b.error)}">ส่งไม่ได้</span>` : '<span class="pill warn">รอส่ง</span>'}</div></button>`).join('') || '<p class="muted center-t">ยังไม่มีบิล</p>'}</div></div>`;
+      <div class="right"><b>${money(b.total)}</b><br>${b.status === 'void' ? '<span class="pill bad">ยกเลิก</span>' : b.pending_cancel ? '<span class="pill warn">รออนุมัติยกเลิก</span>' : b.synced ? '<span class="pill ok">ส่งแล้ว</span>' : b.error ? `<span class="pill bad" title="${esc(b.error)}">ส่งไม่ได้</span>` : '<span class="pill warn">รอส่ง</span>'}</div></button>`).join('') || '<p class="muted center-t">ยังไม่มีบิล</p>'}</div></div>`;
   $('#bdate').onchange = (e) => { S.billsDate = e.target.value || bkkDate(); renderBills(); };
+  const gr = $('#goReq'); if (gr) gr.onclick = () => go('requests');
   const sb = $('#syncBtn'); if (sb) sb.onclick = () => { if (!S.session.token) reLoginModal(); else syncNow(); };
   $$('.bill').forEach(r => r.onclick = () => billDetail(bills.find(b => b.id === r.dataset.id)));
 }
@@ -814,46 +819,132 @@ function canCancel(b) {
 }
 function billDetail(b) {
   const staff = S.staffList.find(s => s.code === b.staff_code);
-  const can = canCancel(b);
+  const can = canCancel(b) && !b.pending_cancel;
   modal(`<div class="rcpt-preview">${receiptHtml(b, staff, '')}</div>
     ${b.status === 'void' ? `<p class="bad">ยกเลิกแล้ว: ${esc(b.void_reason || '')}</p>` : ''}
+    ${b.pending_cancel ? `<div class="banner warn">บิลนี้มีคำขอยกเลิกรอเจ้าของอนุมัติ ${isOwner() ? '<button class="btn sm" id="toReq">ไปอนุมัติ</button>' : ''}</div>` : ''}
     ${!b.synced && b.status !== 'void' ? '<p class="muted sm">บิลยังไม่ถูกส่งขึ้นระบบ — ยกเลิกได้หลังส่งแล้ว</p>' : ''}
     <div class="row end"><button class="btn ghost" onclick="closeModal()">ปิด</button>
     ${can ? '<button class="btn danger" id="voidBtn">ยกเลิกบิล</button>' : ''}
     <button class="btn" id="reprint">พิมพ์ซ้ำ</button></div>`, { wide: true });
   $('#reprint').onclick = () => { printReceipt(b, staff); };
   const vb = $('#voidBtn'); if (vb) vb.onclick = () => voidModal(b);
+  const tr = $('#toReq'); if (tr) tr.onclick = () => { closeModal(); go('requests'); };
 }
-function voidModal(b) {
+function voidModal(b, mode) {
   if (!S.online || !S.session.token) return toast('ต้องออนไลน์และเข้าระบบออนไลน์ก่อนยกเลิกบิล', 'err');
   const c = cancelCfg();
   const needOwner = !isOwner() && num(b.total) > num(c.limit);
+  mode = mode || 'request';
   const owners = S.staffList.filter(s => s.role === 'owner');
+  const prevReason = ($('#vr') && $('#vr').value) || '';
   modal(`<h2>ยกเลิกบิล ${esc(b.bill_no)}</h2>
     <p class="muted">ยอด ${money(b.total)} บาท · ${esc((b.customer || {}).name || '')} · ${thDateTime(b.created_at)}</p>
-    <label>เหตุผลที่ยกเลิก *<input id="vr" placeholder="เช่น ใส่น้ำหนักผิด / ลูกค้าเปลี่ยนใจ" autofocus maxlength="200"></label>
+    <label>เหตุผลที่ยกเลิก *<input id="vr" placeholder="เช่น ใส่น้ำหนักผิด / ลูกค้าเปลี่ยนใจ" maxlength="200" value="${esc(prevReason)}"></label>
     ${needOwner ? `<div class="banner warn">บิลเกิน ${money(c.limit)} บาท ต้องให้เจ้าของอนุมัติ</div>
-      <label>เจ้าของที่อนุมัติ<select id="vo">${owners.map(o => `<option value="${esc(o.code)}">${esc(o.code)}-${esc(o.nickname)}</option>`).join('')}</select></label>
-      <label>PIN เจ้าของ<input id="vp" type="password" inputmode="numeric" maxlength="6" class="pin-input" autocomplete="off"></label>` : ''}
+      <div class="seg"><button data-vm="request" class="${mode === 'request' ? 'on' : ''}">ส่งขออนุมัติ (เจ้าของไม่อยู่)</button><button data-vm="here" class="${mode === 'here' ? 'on' : ''}">เจ้าของอยู่ตรงนี้</button></div>
+      ${mode === 'here' ? `<label>เจ้าของที่อนุมัติ<select id="vo">${owners.map(o => `<option value="${esc(o.code)}">${esc(o.code)}-${esc(o.nickname)}</option>`).join('')}</select></label>
+        <label>PIN เจ้าของ<input id="vp" type="password" inputmode="numeric" maxlength="6" class="pin-input" autocomplete="off"></label>`
+      : `<p class="muted sm">ระบบจะส่งคำขอไปให้เจ้าของ เจ้าของกดอนุมัติจากมือถือได้แม้ไม่อยู่ร้าน ระหว่างรอ บิลยังไม่ถูกยกเลิก</p>`}` : ''}
     ${!isOwner() && !needOwner ? `<p class="muted sm">บิลไม่เกิน ${money(c.limit)} บาท พนักงานยกเลิกเองได้ ระบบบันทึกชื่อคุณและเหตุผลไว้ในประวัติ</p>` : ''}
-    <div class="row end"><button class="btn ghost" id="vBack">กลับ</button><button class="btn danger" id="vOk">ยืนยันยกเลิกบิล</button></div>`, { sticky: true });
+    <div class="row end"><button class="btn ghost" id="vBack">กลับ</button><button class="btn danger" id="vOk">${needOwner && mode === 'request' ? 'ส่งขออนุมัติ' : 'ยืนยันยกเลิกบิล'}</button></div>`, { sticky: true });
+  setTimeout(() => { const f = $('#vp') || $('#vr'); if (f) f.focus(); }, 30);
+  $$('[data-vm]').forEach(x => x.onclick = () => voidModal(b, x.dataset.vm));
   $('#vBack').onclick = () => billDetail(b);
   $('#vOk').onclick = async (ev) => {
     const reason = $('#vr').value.trim(); if (!reason) return toast(ERR.REASON_REQUIRED, 'err');
-    const params = { p_token: S.session.token, p_id: b.id, p_reason: reason };
-    if (needOwner) { params.p_approver_code = $('#vo').value; params.p_approver_pin = $('#vp').value; if (!params.p_approver_pin) return toast('ให้เจ้าของใส่ PIN', 'err'); }
     busy(ev.target, true);
     try {
+      if (needOwner && mode === 'request') {
+        const r = await api('request_cancel', { p_token: S.session.token, p_id: b.id, p_reason: reason });
+        toast(r.existing ? 'บิลนี้ส่งขออนุมัติไว้แล้ว รอเจ้าของ' : 'ส่งคำขอยกเลิกแล้ว รอเจ้าของอนุมัติ');
+        closeModal(); renderBills(); return;
+      }
+      const params = { p_token: S.session.token, p_id: b.id, p_reason: reason };
+      if (needOwner) { params.p_approver_code = $('#vo').value; params.p_approver_pin = $('#vp').value; if (!params.p_approver_pin) { busy(ev.target, false); return toast('ให้เจ้าของใส่ PIN', 'err'); } }
       const r = await api('void_bill', params);
       toast(`ยกเลิกบิล ${b.bill_no} แล้ว${r && r.approved_by ? ' (อนุมัติโดย ' + r.approved_by + ')' : ''}`);
       closeModal(); renderBills();
     } catch (e) {
       busy(ev.target, false);
-      if (e.message === 'NEED_OWNER') { toast(ERR.NEED_OWNER, 'warn'); return; }
       toast(errText(e), 'err'); const vp = $('#vp'); if (vp) vp.value = '';
     }
   };
 }
+
+// ---------------------------------------------------------------- คำขอยกเลิกบิล (เจ้าของ)
+async function renderRequests() {
+  if (!isOwner()) return go('buy');
+  shell('คำขอยกเลิกบิล', '<div class="center"><span class="spin big"></span></div>');
+  if (!S.session.token || !S.online) { $('.main').innerHTML = '<h1 class="screen-title">คำขอยกเลิกบิล</h1><div class="banner warn">ต้องออนไลน์</div>'; return; }
+  let pending = [], recent = [];
+  try { [pending, recent] = await Promise.all([api('list_cancel_requests', { p_token: S.session.token, p_scope: 'pending' }), api('list_cancel_requests', { p_token: S.session.token, p_scope: 'recent' })]); }
+  catch (e) { toast(errText(e), 'err'); }
+  if (S.screen !== 'requests') return;
+  S.pendingReq = pending.length; updateTitle();
+  const M = metals();
+  const itemsLine = (it) => (it || []).map(i => `${esc(M[i.metal] ? M[i.metal].label : i.metal)} ${esc(i.pct)}% ${gram(i.weight)}ก.`).join(' · ');
+  const st = { approved: '<span class="pill ok">อนุมัติ</span>', rejected: '<span class="pill bad">ไม่อนุมัติ</span>', withdrawn: '<span class="pill">ถอนคำขอ</span>', pending: '<span class="pill warn">รออนุมัติ</span>' };
+  const canNotify = 'Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied';
+  $('.main').innerHTML = `<h1 class="screen-title">คำขอยกเลิกบิล</h1>
+    ${canNotify ? '<div class="banner info">ให้เครื่องนี้เด้งแจ้งเตือนเมื่อมีคำขอใหม่ (ระหว่างเปิดระบบไว้) <button class="btn sm" id="askNotify">เปิดแจ้งเตือน</button></div>' : ''}
+    <div class="card"><div class="card-h"><h2>รออนุมัติ (${pending.length})</h2><button class="btn sm ghost" id="reqRefresh">รีเฟรช</button></div>
+    <div class="list">${pending.map((r, i) => `<div class="req">
+      <div class="req-h"><b>${esc(r.bill_no)}</b><b class="big">${money(r.total)} บาท</b></div>
+      <div class="sm">${esc(r.customer_name || '')} · บิลเวลา ${thDateTime(r.bill_created_at)}</div>
+      <div class="sm muted">${itemsLine(r.items)}</div>
+      <div class="req-reason">ขอโดย <b>${esc(r.requested_code)}${r.requested_name ? '-' + esc(r.requested_name) : ''}</b> · ${thTime(r.created_at)}<br>เหตุผล: ${esc(r.reason)}</div>
+      <div class="row end"><button class="btn ghost" data-rej="${i}">ไม่อนุมัติ</button><button class="btn danger" data-app="${i}">อนุมัติยกเลิก</button></div>
+    </div>`).join('') || '<p class="muted center-t">ไม่มีคำขอรออนุมัติ</p>'}</div></div>
+    <div class="card"><h2>ล่าสุด 7 วัน</h2><div class="list">${recent.filter(r => r.status !== 'pending').map(r => `<div class="list-row"><div><b>${esc(r.bill_no)}</b> <span class="muted sm">${money(r.total)} บาท · ขอโดย ${esc(r.requested_code)}</span><br><span class="sm muted">${esc(r.reason)}${r.decide_note ? ' → ' + esc(r.decide_note) : ''}</span></div><div class="right">${st[r.status] || ''}<br><span class="muted sm">${r.decided_at ? thDateTime(r.decided_at) : ''} ${esc(r.decided_code || '')}</span></div></div>`).join('') || '<p class="muted">—</p>'}</div></div>`;
+  $('#reqRefresh').onclick = () => renderRequests();
+  const an = $('#askNotify'); if (an) an.onclick = async () => { try { await Notification.requestPermission(); } catch (e) { /* ignore */ } renderRequests(); };
+  $$('[data-app]').forEach(x => x.onclick = () => decideModal(pending[+x.dataset.app], true));
+  $$('[data-rej]').forEach(x => x.onclick = () => decideModal(pending[+x.dataset.rej], false));
+}
+function decideModal(r, approve) {
+  modal(`<h2>${approve ? 'อนุมัติยกเลิกบิล' : 'ไม่อนุมัติ'} ${esc(r.bill_no)}</h2>
+    <p class="muted">${money(r.total)} บาท · ขอโดย ${esc(r.requested_code)} · เหตุผล: ${esc(r.reason)}</p>
+    ${approve ? '' : '<label>เหตุผลที่ไม่อนุมัติ (พนักงานจะเห็น)<input id="dn" maxlength="200" placeholder="ไม่บังคับ"></label>'}
+    <label>PIN ของคุณ (${esc(me().code)})<input id="dp" type="password" inputmode="numeric" maxlength="6" class="pin-input" autofocus autocomplete="off"></label>
+    <div class="row end"><button class="btn ghost" onclick="closeModal()">กลับ</button><button class="btn ${approve ? 'danger' : ''}" id="dOk">${approve ? 'ยืนยันอนุมัติยกเลิก' : 'ยืนยันไม่อนุมัติ'}</button></div>`, { sticky: true });
+  $('#dp').onkeydown = (e) => { if (e.key === 'Enter') $('#dOk').click(); };
+  $('#dOk').onclick = async (ev) => {
+    busy(ev.target, true);
+    try {
+      await api('decide_cancel', { p_token: S.session.token, p_req: r.id, p_approve: approve, p_pin: $('#dp').value, p_note: ($('#dn') && $('#dn').value.trim()) || null });
+      toast(approve ? `ยกเลิกบิล ${r.bill_no} แล้ว` : `ไม่อนุมัติคำขอ ${r.bill_no}`); closeModal(); renderRequests();
+    } catch (e) { busy(ev.target, false); toast(errText(e), 'err'); $('#dp').value = ''; }
+  };
+}
+
+// ---------------------------------------------------------------- ตรวจคำขอใหม่เป็นระยะ
+let lastPendingSeen = null;
+function updateTitle() { document.title = (isOwner() && S.pendingReq ? `(${S.pendingReq}) ` : '') + 'DD หลอมทอง'; }
+async function pollPending() {
+  if (!S.session || !S.session.token || !S.online || S.screen === 'login') return;
+  try {
+    const r = await api('pending_counts', { p_token: S.session.token });
+    if (isOwner()) {
+      const n = r.cancel_requests || 0, before = S.pendingReq || 0;
+      S.pendingReq = n; updateTitle();
+      if (n > before && lastPendingSeen !== null) {
+        toast(`มีคำขอยกเลิกบิลใหม่ (${n} รายการรออนุมัติ)`, 'warn');
+        try { if ('Notification' in window && Notification.permission === 'granted') { const nt = new Notification('DD หลอมทอง: มีคำขอยกเลิกบิล', { body: `รออนุมัติ ${n} รายการ`, icon: 'icon-192.png', tag: 'dd-cancel' }); nt.onclick = () => { window.focus(); go('requests'); }; } } catch (e) { /* ignore */ }
+      }
+      lastPendingSeen = n;
+      if (n !== before && ['bills', 'more'].includes(S.screen) && !$('#modal')) { const sc = window.scrollY; go(S.screen); window.scrollTo(0, sc); }
+      else if (n !== before) { $$('.tab[data-go=more]').forEach(t => { const old = t.querySelector('.badge'); if (old) old.remove(); if (n) t.insertAdjacentHTML('beforeend', `<i class="badge">${n}</i>`); }); }
+    } else {
+      const seen = load('dd_seen_decisions', []);
+      const fresh = (r.my_decided || []).filter(d => !seen.includes(d.id));
+      fresh.forEach(d => toast(d.status === 'approved' ? `เจ้าของ (${d.decided_code}) อนุมัติยกเลิกบิล ${d.bill_no} แล้ว` : `เจ้าของไม่อนุมัติยกเลิกบิล ${d.bill_no}${d.decide_note ? ': ' + d.decide_note : ''}`, d.status === 'approved' ? 'ok' : 'warn'));
+      if (fresh.length) { store('dd_seen_decisions', seen.concat(fresh.map(d => d.id)).slice(-50)); if (S.screen === 'bills') renderBills(); }
+    }
+  } catch (e) { if (e.message === 'SESSION_INVALID') sessionExpired(); }
+}
+setInterval(pollPending, 30000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) pollPending(); });
 
 // ---------------------------------------------------------------- customers
 function renderCustomers() {
@@ -878,7 +969,7 @@ async function customerDetail(c) {
 function renderMore() {
   const items = [
     ['pin', 'เปลี่ยน PIN / ชื่อเล่นของฉัน', 'ทุกคน'],
-    ...(isOwner() ? [['todayprice', 'ตั้งราคาวันนี้ / เปลี่ยนราคาระหว่างวัน', 'เจ้าของ'], ['settings', 'ตั้งค่าราคา & ร้าน', 'เจ้าของ'], ['staff', 'จัดการพนักงาน', 'เจ้าของ'], ['audit', 'ประวัติการใช้งาน (ตรวจสอบ)', 'เจ้าของ']] : [])
+    ...(isOwner() ? [['requests', `คำขอยกเลิกบิล${S.pendingReq ? ' 🔴 ' + S.pendingReq : ''}`, 'เจ้าของ'], ['todayprice', 'ตั้งราคาวันนี้ / เปลี่ยนราคาระหว่างวัน', 'เจ้าของ'], ['settings', 'ตั้งค่าราคา & ร้าน', 'เจ้าของ'], ['staff', 'จัดการพนักงาน', 'เจ้าของ'], ['audit', 'ประวัติการใช้งาน (ตรวจสอบ)', 'เจ้าของ']] : [])
   ];
   shell('เพิ่มเติม', `<div class="card list">${items.map(i => `<button class="list-row" data-go3="${i[0]}"><b>${i[1]}</b><span class="muted sm">${i[2]} ›</span></button>`).join('')}</div>
     <div class="card"><h2>เครื่องนี้</h2><p class="muted sm">เครื่อง ${esc(S.device.device_id)} · ${esc(S.device.name)} · เวอร์ชัน ${APP_VERSION}${DEMO ? ' · โหมดทดลอง' : ''}</p>
@@ -1024,7 +1115,7 @@ async function renderAudit() {
   shell('ประวัติการใช้งาน', '<div class="center"><span class="spin big"></span></div>');
   let rows = [];
   try { rows = await api('list_audit', { p_token: S.session.token, p_from: auditDate, p_to: auditDate }); } catch (e) { toast(errText(e), 'err'); }
-  const A = { login: 'เข้าระบบ', logout: 'ออกจากระบบ', pin_wrong: '⚠ ใส่ PIN ผิด', create_bill: 'ทำบิลรับซื้อ', void_bill: '⚠ ยกเลิกบิล', save_setting: 'แก้การตั้งค่า', add_staff: 'เพิ่มพนักงาน', reset_pin: 'รีเซ็ต PIN', set_staff_active: 'เปิด/ปิดพนักงาน', change_pin: 'เปลี่ยน PIN', set_nickname: 'เปลี่ยนชื่อเล่น', register_device: 'ลงทะเบียนเครื่อง', setup_owner: 'ตั้งค่าร้าน' };
+  const A = { login: 'เข้าระบบ', logout: 'ออกจากระบบ', pin_wrong: '⚠ ใส่ PIN ผิด', create_bill: 'ทำบิลรับซื้อ', void_bill: '⚠ ยกเลิกบิล', request_cancel: 'ขอยกเลิกบิล', reject_cancel: 'ไม่อนุมัติคำขอยกเลิก', withdraw_cancel: 'ถอนคำขอยกเลิก', save_setting: 'แก้การตั้งค่า', add_staff: 'เพิ่มพนักงาน', reset_pin: 'รีเซ็ต PIN', set_staff_active: 'เปิด/ปิดพนักงาน', change_pin: 'เปลี่ยน PIN', set_nickname: 'เปลี่ยนชื่อเล่น', register_device: 'ลงทะเบียนเครื่อง', setup_owner: 'ตั้งค่าร้าน' };
   $('.main').innerHTML = `<h1 class="screen-title">ประวัติ <input type="date" id="adate" value="${auditDate}" max="${bkkDate()}"></h1>
     <div class="card list">${rows.map(r => `<div class="list-row ${/wrong|void/.test(r.action) ? 'warnrow' : ''}"><div><b>${esc(A[r.action] || r.action)}</b> <span class="muted sm">${esc(r.staff_code || '')} · เครื่อง ${esc(r.device_id || '-')}</span><br><span class="sm muted">${esc(r.detail ? Object.entries(r.detail).filter(([k, v]) => k !== 'value' && v != null).map(([k, v]) => `${k}: ${typeof v === 'object' ? '…' : v}`).join(' · ') : '')}</span></div><span class="muted sm">${thTime(r.at)}</span></div>`).join('') || '<p class="muted">ไม่มีรายการ</p>'}</div>`;
   $('#adate').onchange = (e) => { auditDate = e.target.value; renderAudit(); };

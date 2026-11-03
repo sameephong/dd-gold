@@ -18,6 +18,7 @@
   };
   const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || null; } catch (e) { return null; } };
   let db = load() || { staff: [], devices: [], sessions: [], settings: JSON.parse(JSON.stringify(DEFAULT_SETTINGS)), customers: {}, bills: [], audit: [] };
+  db.cancel_requests = db.cancel_requests || [];
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { console.warn('demo save failed', e); } };
   const err = (m) => { throw new Error(m); };
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'x' + Math.random().toString(16).slice(2) + Date.now());
@@ -90,7 +91,7 @@
       log(s, a.dev, 'create_bill', { bill_no: no, total: p_bill.total, customer: c.id_card });
       return { id: p_bill.id, bill_no: no };
     },
-    list_bills: ({ p_token, p_from, p_to }) => { auth(p_token); return db.bills.filter(b => { const d = bkkDate(b.created_at); return d >= p_from && d <= p_to; }).sort((a, b) => b.created_at.localeCompare(a.created_at)); },
+    list_bills: ({ p_token, p_from, p_to }) => { auth(p_token); return db.bills.filter(b => { const d = bkkDate(b.created_at); return d >= p_from && d <= p_to; }).sort((a, b) => b.created_at.localeCompare(a.created_at)).map(b => ({ ...b, pending_cancel: db.cancel_requests.some(r => r.bill_id === b.id && r.status === 'pending') })); },
     find_customers: ({ p_token, p_q }) => {
       auth(p_token); const q = (p_q || '').trim().toLowerCase(); if (q.length < 2) return [];
       const byBill = new Set(db.bills.filter(b => b.bill_no.toLowerCase().includes(q)).map(b => b.customer_id));
@@ -114,9 +115,48 @@
         }
       }
       b.status = 'void'; b.void_reason = p_reason; b.voided_at = new Date().toISOString(); b.voided_by_code = a.s.code; b.approved_by_code = appr && appr.code;
+      db.cancel_requests.filter(r => r.bill_id === p_id && r.status === 'pending').forEach(r => { r.status = 'approved'; r.decided_code = (appr || a.s).code; r.decided_at = new Date().toISOString(); r.decide_note = 'ยกเลิกที่หน้าร้าน'; });
       log(a.s, a.dev, 'void_bill', { bill_no: b.bill_no, total: b.total, reason: p_reason, approved_by: appr && appr.code });
       return { ok: true, bill_no: b.bill_no, approved_by: appr && appr.code };
     },
+    request_cancel: ({ p_token, p_id, p_reason }) => {
+      const a = auth(p_token);
+      if (!(p_reason || '').trim()) return { error: 'REASON_REQUIRED' };
+      const b = db.bills.find(x => x.id === p_id && x.status === 'ok'); if (!b) return { error: 'NOT_FOUND' };
+      if (a.s.role !== 'owner') {
+        const c = db.settings.cancel || {};
+        if (!c.enabled) return { error: 'STAFF_CANCEL_OFF' };
+        if (c.today_only !== false && bkkDate(b.created_at) !== bkkDate(new Date().toISOString())) return { error: 'BILL_NOT_TODAY' };
+      }
+      const ex = db.cancel_requests.find(r => r.bill_id === p_id && r.status === 'pending'); if (ex) return { id: ex.id, existing: true };
+      const r = { id: uid(), bill_id: p_id, requested_code: a.s.code, requested_name: a.s.nickname, reason: p_reason.trim(), status: 'pending', created_at: new Date().toISOString() };
+      db.cancel_requests.push(r); log(a.s, a.dev, 'request_cancel', { bill_no: b.bill_no, total: b.total, reason: p_reason }); return { id: r.id };
+    },
+    list_cancel_requests: ({ p_token, p_scope }) => {
+      const a = auth(p_token); const week = Date.now() - 7 * 864e5;
+      return db.cancel_requests.filter(r => (p_scope === 'pending' || !p_scope ? r.status === 'pending' : new Date(r.created_at) > week) && (a.s.role === 'owner' || r.requested_code === a.s.code))
+        .map(r => { const b = db.bills.find(x => x.id === r.bill_id) || {}; return { ...r, bill_no: b.bill_no, total: b.total, bill_created_at: b.created_at, customer_name: (b.customer || {}).name, items: b.items }; })
+        .sort((x, y) => y.created_at.localeCompare(x.created_at));
+    },
+    pending_counts: ({ p_token }) => {
+      const a = auth(p_token);
+      if (a.s.role === 'owner') return { cancel_requests: db.cancel_requests.filter(r => r.status === 'pending').length };
+      const day = Date.now() - 864e5;
+      return { my_pending: db.cancel_requests.filter(r => r.requested_code === a.s.code && r.status === 'pending').length,
+        my_decided: db.cancel_requests.filter(r => r.requested_code === a.s.code && ['approved', 'rejected'].includes(r.status) && new Date(r.decided_at) > day)
+          .map(r => ({ id: r.id, status: r.status, bill_no: (db.bills.find(b => b.id === r.bill_id) || {}).bill_no, decided_code: r.decided_code, decide_note: r.decide_note })) };
+    },
+    decide_cancel: ({ p_token, p_req, p_approve, p_pin, p_note }) => {
+      const a = auth(p_token); if (a.s.role !== 'owner') return { error: 'OWNER_ONLY' };
+      const pr = pinCheck(a.s.code, p_pin); if (pr !== 'OK') return { error: pr };
+      const r = db.cancel_requests.find(x => x.id === p_req); if (!r || r.status !== 'pending') return { error: 'REQUEST_DONE' };
+      const b = db.bills.find(x => x.id === r.bill_id);
+      if (p_approve && b.status === 'ok') { b.status = 'void'; b.void_reason = r.reason; b.voided_at = new Date().toISOString(); b.approved_by_code = a.s.code; }
+      Object.assign(r, { status: p_approve ? 'approved' : 'rejected', decided_code: a.s.code, decided_at: new Date().toISOString(), decide_note: p_note || null });
+      log(a.s, a.dev, p_approve ? 'void_bill' : 'reject_cancel', { bill_no: b.bill_no, total: b.total, reason: r.reason, requested_by: r.requested_code, approved_by: p_approve ? a.s.code : undefined, note: p_note });
+      return { ok: true, bill_no: b.bill_no, approved: !!p_approve };
+    },
+    withdraw_cancel: ({ p_token, p_req }) => { const a = auth(p_token); const r = db.cancel_requests.find(x => x.id === p_req && x.status === 'pending' && (x.requested_code === a.s.code || a.s.role === 'owner')); if (!r) return { error: 'REQUEST_DONE' }; r.status = 'withdrawn'; r.decided_at = new Date().toISOString(); log(a.s, a.dev, 'withdraw_cancel', {}); return { ok: true }; },
     list_staff: ({ p_token }) => { owner(p_token); return db.staff.map(s => ({ ...pub(s), active: s.active, locked: s.locked_until && new Date(s.locked_until) > new Date(), last_login: (db.sessions.filter(x => x.staff_id === s.id).map(x => x.created_at).sort().pop()) || null })); },
     add_staff: ({ p_token, p_nickname, p_role }) => {
       const a = owner(p_token); const pre = p_role === 'owner' ? 'OWN' : 'DD';
