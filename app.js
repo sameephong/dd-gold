@@ -4,7 +4,7 @@
 'use strict';
 const CFG = window.DD_CONFIG || {};
 const DEMO = !CFG.SUPABASE_URL;
-const APP_VERSION = '1.9.1';
+const APP_VERSION = '1.10.0';
 
 // ---------------------------------------------------------------- utils
 const $ = (s, el = document) => el.querySelector(s);
@@ -40,7 +40,7 @@ const ERR = {
   PIN_WRONG: 'PIN ไม่ถูกต้อง', DEVICE_INVALID: 'เครื่องนี้ยังไม่ได้ลงทะเบียน หรือถูกยกเลิกแล้ว', SESSION_INVALID: 'หมดเวลาเข้าระบบ กรุณาเข้าระบบใหม่',
   OWNER_ONLY: 'เฉพาะเจ้าของเท่านั้น', PIN_WEAK: 'PIN ง่ายเกินไป เลือกตัวเลขอื่น', PIN_FORMAT: 'PIN ต้องเป็นตัวเลข 4 หลัก (เจ้าของ 6 หลัก)', PIN_FORMAT_6: 'PIN เจ้าของต้องเป็นตัวเลข 6 หลัก',
   ALREADY_SETUP: 'ร้านนี้ตั้งค่าเจ้าของไปแล้ว', CUSTOMER_REQUIRED: 'ต้องมีเลขบัตรประชาชนผู้ขาย', WRONG_BRANCH: 'พนักงานไม่ได้อยู่สาขานี้', CANNOT_SELF: 'ปิดบัญชีตัวเองไม่ได้',
-  NOT_FOUND: 'ไม่พบบิล หรือบิลถูกยกเลิกไปแล้ว', REASON_REQUIRED: 'ต้องใส่เหตุผลที่ยกเลิก', STAFF_CANCEL_OFF: 'เจ้าของปิดฟังก์ชันให้พนักงานยกเลิกบิลไว้', BILL_NOT_TODAY: 'พนักงานยกเลิกได้เฉพาะบิลของวันนี้', NEED_OWNER: 'บิลนี้เกินวงเงิน ต้องให้เจ้าของอนุมัติ', REQUEST_DONE: 'คำขอนี้ถูกตัดสินไปแล้ว', ITEMS_USED: 'ของในบิลนี้ถูกนำไปหลอม/ขายแล้ว ยกเลิกบิลไม่ได้ (ยกเลิกการหลอมก่อน)', ITEMS_CHANGED: 'รายการที่เลือกมีการเปลี่ยนแปลง กรุณาโหลดใหม่', MIXED_METAL: 'หลอมรวมได้เฉพาะโลหะชนิดเดียวกัน', OUT_HEAVIER: 'น้ำหนักหลังหลอมมากกว่าก่อนหลอม — ตรวจตัวเลขอีกครั้ง', BAD_WEIGHT: 'ใส่น้ำหนักหลังหลอม', BAD_PCT: 'ใส่ % ที่วัดได้ (0-100)', MELT_LOCKED: 'ก้อนนี้ถูกขาย/ยกเลิกไปแล้ว', SELL_NOT_ALLOWED: 'ไม่มีสิทธิ์บันทึกการขาย (เจ้าของเปิดได้ที่ ตั้งค่า → ขาย)', BUYER_REQUIRED: 'ใส่ชื่อผู้ซื้อ', NO_LINES: 'เลือกของที่ขาย', LINE_AMOUNT: 'ใส่ยอดขายให้ครบทุกรายการ', STOCK_CHANGED: 'ของบางรายการถูกขายหรือเปลี่ยนสถานะไปแล้ว กรุณาโหลดใหม่', SALE_LOCKED: 'รายการขายนี้ถูกปิดไปแล้ว', DOC_TOO_BIG: 'รูปใหญ่เกินไป', DOC_LIMIT: 'แนบได้สูงสุด 10 ไฟล์', NOTE_REQUIRED: 'พิมพ์หมายเหตุ', MERGE_NEED_2: 'เลือกอย่างน้อย 2 ก้อนเพื่อรวม', LOT_LOCKED: 'ล็อตนี้ปิดไปแล้ว', SILVER_USED: 'แร่เงินที่รับคืนถูกขายไปแล้ว ยกเลิกไม่ได้', DEMO_ONLY_SUPABASE: 'ฟังก์ชันนี้ใช้ได้เมื่อเชื่อม Supabase แล้ว', NET: 'ไม่มีอินเทอร์เน็ต', OFFLINE_LOGIN: 'เครื่องนี้ยังไม่เคยเข้าระบบด้วยรหัสนี้ตอนออนไลน์ จึงเข้าแบบออฟไลน์ไม่ได้'
+  NOT_FOUND: 'ไม่พบบิล หรือบิลถูกยกเลิกไปแล้ว', REASON_REQUIRED: 'ต้องใส่เหตุผลที่ยกเลิก', STAFF_CANCEL_OFF: 'เจ้าของปิดฟังก์ชันให้พนักงานยกเลิกบิลไว้', BILL_NOT_TODAY: 'พนักงานยกเลิกได้เฉพาะบิลของวันนี้', NEED_OWNER: 'บิลนี้เกินวงเงิน ต้องให้เจ้าของอนุมัติ', REQUEST_DONE: 'คำขอนี้ถูกตัดสินไปแล้ว', ITEMS_USED: 'ของในบิลนี้ถูกนำไปหลอม/ขายแล้ว ยกเลิกบิลไม่ได้ (ยกเลิกการหลอมก่อน)', ITEMS_CHANGED: 'รายการที่เลือกมีการเปลี่ยนแปลง กรุณาโหลดใหม่', MIXED_METAL: 'หลอมรวมได้เฉพาะโลหะชนิดเดียวกัน', OUT_HEAVIER: 'น้ำหนักหลังหลอมมากกว่าก่อนหลอม — ตรวจตัวเลขอีกครั้ง', BAD_WEIGHT: 'ใส่น้ำหนักหลังหลอม', BAD_PCT: 'ใส่ % ที่วัดได้ (0-100)', MELT_LOCKED: 'ก้อนนี้ถูกขาย/ยกเลิกไปแล้ว', SELL_NOT_ALLOWED: 'ไม่มีสิทธิ์บันทึกการขาย (เจ้าของเปิดได้ที่ ตั้งค่า → ขาย)', BUYER_REQUIRED: 'ใส่ชื่อผู้ซื้อ', NO_LINES: 'เลือกของที่ขาย', LINE_AMOUNT: 'ใส่ยอดขายให้ครบทุกรายการ', STOCK_CHANGED: 'ของบางรายการถูกขายหรือเปลี่ยนสถานะไปแล้ว กรุณาโหลดใหม่', SALE_LOCKED: 'รายการขายนี้ถูกปิดไปแล้ว', DOC_TOO_BIG: 'รูปใหญ่เกินไป', DOC_LIMIT: 'แนบได้สูงสุด 10 ไฟล์', NOTE_REQUIRED: 'พิมพ์หมายเหตุ', MERGE_NEED_2: 'เลือกอย่างน้อย 2 ก้อนเพื่อรวม', LOT_LOCKED: 'ล็อตนี้ปิดไปแล้ว', SILVER_USED: 'แร่เงินที่รับคืนถูกขายไปแล้ว ยกเลิกไม่ได้', DEMO_ONLY_SUPABASE: 'ฟังก์ชันนี้ใช้ได้เมื่อเชื่อม Supabase แล้ว', NO_VIEW: 'เจ้าของไม่ได้เปิดให้พนักงานดูข้อมูลการขาย', NET: 'ไม่มีอินเทอร์เน็ต', OFFLINE_LOGIN: 'เครื่องนี้ยังไม่เคยเข้าระบบด้วยรหัสนี้ตอนออนไลน์ จึงเข้าแบบออฟไลน์ไม่ได้'
 };
 const errText = (e) => { const m = (e && e.message) || String(e); if (m.startsWith('LOCKED:')) return `ใส่ PIN ผิดหลายครั้ง ล็อกไว้ ${m.split(':')[1]} นาที`; return ERR[m] || m; };
 const isNet = (e) => e && (e.net || e.name === 'TypeError' || e.name === 'AbortError');
@@ -685,7 +685,9 @@ function confirmBill() {
     <p class="muted">ใส่ PIN ของคนที่ทำรายการนี้</p>
     <label>รหัสพนักงาน<select id="cf_code">${people.map(p => `<option value="${esc(p.code)}" ${p.code === me().code ? 'selected' : ''}>${esc(p.code)}-${esc(p.nickname)}</option>`).join('')}</select></label>
     <input id="cf_pin" type="password" inputmode="numeric" maxlength="6" class="pin-input" autofocus autocomplete="off">
+    <div id="cf_drawer"></div>
     <div class="row end"><button class="btn ghost" onclick="closeModal()">กลับไปแก้</button><button class="btn gold" id="cf_ok">บันทึกและพิมพ์</button></div>`, { sticky: true });
+  showDrawerInConfirm();
   $('#cf_pin').onkeydown = (e) => { if (e.key === 'Enter') $('#cf_ok').click(); };
   $('#cf_ok').onclick = async (ev) => {
     const code = $('#cf_code').value, pin = $('#cf_pin').value;
@@ -698,6 +700,28 @@ function confirmBill() {
     if (!ok) { toast(ERR.PIN_WRONG, 'err'); busy(ev.target, false); $('#cf_pin').value = ''; return; }
     await saveBill(code);
   };
+}
+// เงินสดในลิ้นชัก: ดึงจากเซิร์ฟเวอร์ ถ้าออฟไลน์ใช้ค่าล่าสุดที่จำไว้ แล้วหักบิลเงินสดที่ยังไม่ส่งขึ้นระบบ
+async function drawerBalance() {
+  const today = bkkDate();
+  if (S.online && S.session.token && !DEMO) {
+    try { const r = await api('drawer_now', { p_token: S.session.token }); S.drawerCache = { date: today, balance: num(r.balance), float: num(r.float), at: Date.now() }; store('dd_drawer', S.drawerCache); } catch (e) { }
+  }
+  let c = S.drawerCache || load('dd_drawer', null);
+  const fl = num(((S.settings && S.settings.drawer) || {}).float ?? 50000);
+  if (!c || c.date !== today) c = { date: today, balance: fl, float: fl, at: 0, guess: true };
+  const local = (await idb.all('bills').catch(() => [])).filter(b => !b.synced && bkkDate(b.created_at) === today);
+  return { ...c, balance: c.balance - local.reduce((t, b) => t + num(b.payload.pay_cash), 0) };
+}
+async function showDrawerInConfirm() {
+  const el = $('#cf_drawer'); if (!el) return;
+  const B = S.buy, total = buyTotal(), cash = B.cash == null ? total : Math.min(num(B.cash), total);
+  if (!cash) { el.innerHTML = `<p class="muted sm">จ่ายโอนทั้งหมด ${money(total)} บาท — ไม่ใช้เงินในลิ้นชัก</p>`; return; }
+  el.innerHTML = '<p class="muted sm">กำลังเช็กเงินสดในลิ้นชัก…</p>';
+  const d = await drawerBalance(); if (!$('#cf_drawer')) return;
+  const after = d.balance - cash;
+  el.innerHTML = `<div class="banner ${after < 0 ? 'warn' : 'info'}" style="display:block">💵 เงินสดในลิ้นชัก ${money(d.balance)} − จ่ายบิลนี้ ${money(cash)} = <b class="${after < 0 ? 'bad' : ''}">${money(after)}</b> บาท
+    ${after < 0 ? '<br><b>⚠️ เงินสดในลิ้นชักไม่พอ</b> — แบ่งจ่ายโอนบางส่วน หรือเติมเงินลิ้นชักก่อน' : ''}${d.guess ? '<br><span class="sm">(ออฟไลน์ — ประมาณจากเงินตั้งต้น)</span>' : ''}</div>`;
 }
 function nextBillNo() {
   const d = now(); const ymd = bkkDate(d).split('-'); const be = String(+ymd[0] + 543).slice(2);
@@ -1216,14 +1240,14 @@ function compressImage(file, max, q) {
 async function saleDetail(id) {
   let x; try { x = await api('get_sale', { p_token: S.session.token, p_id: id }); } catch (e) { return toast(errText(e), 'err'); }
   if (!x) return;
-  const M = metals(), exp = num(x.transport_cost) + num(x.other_cost), profit = num(x.total_amount) - num(x.total_cost) - exp;
+  const M = metals(), exp = num(x.transport_cost) + num(x.other_cost), profit = num(x.total_amount) - num(x.total_cost) - exp, showP = x.total_cost != null;
   modal(`<h2>${esc(x.sale_no)} ${x.buyer_type === 'refinery' ? '🏭' : '🏪'} ${esc(x.buyer_name)}</h2>
     <p class="muted">${thDateTime(x.created_at)} · บันทึกโดย ${esc(x.staff_code || '')}${x.buyer_phone ? ' · โทร ' + esc(x.buyer_phone) : ''}</p>
     ${x.status === 'cancelled' ? `<div class="banner warn">ยกเลิกแล้ว: ${esc(x.cancel_reason || '')}</div>` : x.status === 'paid' ? `<div class="banner info">รับเงินแล้ว ${x.paid_at ? thDateTime(x.paid_at) : ''} · ${esc({ transfer: 'โอน', cash: 'เงินสด', cheque: 'เช็ค' }[x.pay_method] || x.pay_method || '')}</div>` : `<div class="banner warn">รอรับเงิน${x.due_date ? ' · กำหนด ' + esc(dueTh(x.due_date)) : ''}</div>`}
-    <table class="tbl sale-tbl"><thead><tr><th>รายการ</th><th>น้ำหนัก</th><th>% เรา/ผู้ซื้อ</th><th>ขายได้</th><th>กำไร</th></tr></thead><tbody>
-      ${x.lines.map(l => `<tr><td>${esc(l.label)}<br><span class="muted sm">${esc(M[l.metal] ? M[l.metal].label : l.metal)}</span></td><td>${gram(l.weight)}</td><td>${esc(l.our_pct)} / <b class="${num(l.buyer_pct) < num(l.our_pct) ? 'bad' : ''}">${esc(l.buyer_pct)}</b></td><td>${money(l.amount)}</td><td class="${num(l.amount) - num(l.cost) >= 0 ? 'okc' : 'bad'}">${money(num(l.amount) - num(l.cost))}</td></tr>`).join('')}
+    <table class="tbl sale-tbl"><thead><tr><th>รายการ</th><th>น้ำหนัก</th><th>% เรา/ผู้ซื้อ</th><th>ขายได้</th>${showP ? '<th>กำไร</th>' : ''}</tr></thead><tbody>
+      ${x.lines.map(l => `<tr><td>${esc(l.label)}<br><span class="muted sm">${esc(M[l.metal] ? M[l.metal].label : l.metal)}</span></td><td>${gram(l.weight)}</td><td>${esc(l.our_pct)} / <b class="${num(l.buyer_pct) < num(l.our_pct) ? 'bad' : ''}">${esc(l.buyer_pct)}</b></td><td>${money(l.amount)}</td>${showP ? `<td class="${num(l.amount) - num(l.cost) >= 0 ? 'okc' : 'bad'}">${money(num(l.amount) - num(l.cost))}</td>` : ''}</tr>`).join('')}
     </tbody></table>
-    <div class="sell-total"><div><span>ยอดขาย</span><b>${money(x.total_amount)}</b></div><div><span>ทุนของ</span><b>${money(x.total_cost)}</b></div><div><span>ค่าใช้จ่าย</span><b>${money(exp)}</b></div><div><span>กำไรสุทธิ</span><b class="${profit >= 0 ? 'okc' : 'bad'}">${money(profit)}</b></div></div>
+    <div class="sell-total"><div><span>ยอดขาย</span><b>${money(x.total_amount)}</b></div>${showP ? `<div><span>ทุนของ</span><b>${money(x.total_cost)}</b></div>` : ''}<div><span>ค่าใช้จ่าย</span><b>${money(exp)}</b></div>${showP ? `<div><span>กำไรสุทธิ</span><b class="${profit >= 0 ? 'okc' : 'bad'}">${money(profit)}</b></div>` : ''}</div>
     ${x.fine_our ? `<p class="muted sm">เนื้อทองตามเรา ${gram(x.fine_our)} ก. · ตามผู้ซื้อ ${gram(x.fine_buyer)} ก. (ต่าง ${gram(num(x.fine_buyer) - num(x.fine_our))} ก.)</p>` : ''}
     ${x.note ? `<p class="sm">หมายเหตุ: ${esc(x.note)}</p>` : ''}
     <h3>เอกสาร (${x.docs.length})</h3><div class="docs">${x.docs.map(dc => `<button class="btn ghost sm" data-doc="${dc.id}">📎 ${esc(dc.name || 'เอกสาร')}</button>`).join('')}
@@ -1432,7 +1456,7 @@ async function renderBills() {
   if (S.screen !== 'bills') return;
   const local = (await idb.all('bills').catch(() => [])).filter(b => !b.synced && bkkDate(b.created_at) === S.billsDate);
   sumCache = { d, bills };
-  const M = metals();
+  const M = metals(), V = d.view || { sales: true, profit: true, pending: true };
   // ---- เงินออก
   const okBills = d.bills.filter(b => b.status !== 'void');
   const buyTotal = okBills.reduce((t, b) => t + num(b.total), 0), buyCash = okBills.reduce((t, b) => t + num(b.pay_cash), 0), buyTr = okBills.reduce((t, b) => t + num(b.pay_transfer), 0);
@@ -1453,7 +1477,8 @@ async function renderBills() {
   const overdue = pend.filter(x => x.due_date && x.due_date < bkkDate()).length;
   const openNoAmt = d.open_lots.filter(r => !pend.some(p => p.lot_no === r.lot_no));
   // ---- เงินสดในลิ้นชัก
-  const drawer = num(d.drawer_float) + cashIn - buyCash - meltCost - transCost - shopExp;
+  const drawer = d.drawer ? num(d.drawer.balance) : num(d.drawer_float) + cashIn - buyCash - meltCost - transCost - shopExp;
+  if (S.billsDate === bkkDate() && d.drawer) S.drawerCache = { date: S.billsDate, balance: num(d.drawer.balance), float: num(d.drawer.float), at: Date.now() };
   // ---- หมายเหตุ
   const notesBy = {}; d.notes.forEach(n => { (notesBy[n.ref_id] = notesBy[n.ref_id] || []).push(n); });
   // ---- รายการ (timeline)
@@ -1471,7 +1496,7 @@ async function renderBills() {
     const paidNow = x.status === 'paid' && x.paid_at && (new Date(x.paid_at) - new Date(x.created_at)) < 180000;
     if (paidNow) paidIds.add(x.id);
     ev.push({ kind: x.status === 'cancelled' ? 'void' : 'sell', group: 'sell', at: x.created_at, ref: 'sale', id: x.id, title: `ขาย ${x.sale_no}`, staff: x.staff_code,
-      sub: `${x.buyer_type === 'refinery' ? '🏭' : '🏪'} ${x.buyer_name} · ${x.lines_label || ''} · กำไร ${money(num(x.total_amount) - num(x.total_cost) - num(x.transport_cost) - num(x.other_cost))}`,
+      sub: `${x.buyer_type === 'refinery' ? '🏭' : '🏪'} ${x.buyer_name} · ${x.lines_label || ''}${x.total_cost != null ? ` · กำไร ${money(num(x.total_amount) - num(x.total_cost) - num(x.transport_cost) - num(x.other_cost))}` : ''}`,
       amt: paidNow ? saleReceived(x) : null, amtTxt: paidNow ? null : (x.status === 'cancelled' ? money(x.total_amount) : `รอรับ ${money(saleExpected(x))}`), amtSub: paidNow ? (PAY_TH[x.pay_method] || '') : (x.due_date ? `กำหนด ${shortTh(x.due_date)}` : ''), voided: x.status === 'cancelled' });
   });
   d.paid.filter(x => !paidIds.has(x.id)).forEach(x => ev.push({ kind: 'pay', group: 'sell', at: x.paid_at, ref: 'sale', id: x.id, title: `รับเงิน ${x.sale_no}`, staff: '',
@@ -1487,11 +1512,11 @@ async function renderBills() {
   <h1 class="screen-title">สรุป ${modeToggle()} <input type="date" id="bdate" value="${S.billsDate}" max="${bkkDate()}"> <span class="muted sm" style="font-weight:400">อัปเดตล่าสุด ${thTime(d.server_time)}</span> <button class="btn ghost sm" id="sumRefresh">รีเฟรช</button></h1>
   ${local.length ? `<div class="banner warn">มีบิลในเครื่องนี้ยังไม่ส่งขึ้นระบบ ${local.length} บิล — ยังไม่รวมในตัวเลขด้านล่าง <button class="btn sm" id="syncBtn">ส่งเลย</button></div>` : ''}
   <div class="flow">
-    <div class="kpi in"><span>💰 เงินเข้า${S.billsDate === bkkDate() ? 'วันนี้' : ''}</span><b>+${money(inTotal)}</b><small>ขาย/รับเงิน ${inN} รายการ</small></div>
+    ${V.sales ? `<div class="kpi in"><span>💰 เงินเข้า${S.billsDate === bkkDate() ? 'วันนี้' : ''}</span><b>+${money(inTotal)}</b><small>ขาย/รับเงิน ${inN} รายการ</small></div>` : ''}
     <div class="kpi out"><span>💸 เงินออก${S.billsDate === bkkDate() ? 'วันนี้' : ''}</span><b>−${money(outTotal)}</b><small>รับซื้อ ${okBills.length} บิล + ค่าใช้จ่าย</small></div>
-    <div class="kpi"><span>สุทธิ${S.billsDate === bkkDate() ? 'วันนี้' : ''}</span><b class="${inTotal - outTotal >= 0 ? 'okc' : 'bad'}">${inTotal - outTotal >= 0 ? '+' : '−'}${money(Math.abs(inTotal - outTotal))}</b><small>เงินเข้า − เงินออก</small></div>
-    <div class="kpi wait"><span>⏳ รอรับเงิน</span><b>${money(sumP(pend))}</b><small>${pend.length} รายการ${overdue ? ` · เลยกำหนด ${overdue}` : ''}</small></div>
-    <div class="kpi cash"><span>เงินสดในลิ้นชัก (คาด)</span><b>${money(drawer)}</b><small>เงินตั้งต้น ${money(d.drawer_float)} + สดเข้า − สดออก</small></div>
+    ${V.sales ? `<div class="kpi"><span>สุทธิ${S.billsDate === bkkDate() ? 'วันนี้' : ''}</span><b class="${inTotal - outTotal >= 0 ? 'okc' : 'bad'}">${inTotal - outTotal >= 0 ? '+' : '−'}${money(Math.abs(inTotal - outTotal))}</b><small>เงินเข้า − เงินออก</small></div>` : ''}
+    ${V.pending ? `<div class="kpi wait"><span>⏳ รอรับเงิน</span><b>${money(sumP(pend))}</b><small>${pend.length} รายการ${overdue ? ` · เลยกำหนด ${overdue}` : ''}</small></div>` : ''}
+    <div class="kpi cash"><span>💵 เงินสดในลิ้นชัก (คาด)</span><b class="${drawer < 0 ? 'bad' : ''}">${money(drawer)}</b><small>เงินตั้งต้น ${money(d.drawer ? d.drawer.float : d.drawer_float)} − จ่ายรับซื้อเงินสด ${money(d.drawer ? d.drawer.cash_buy : buyCash)}${V.sales ? ' + ขายได้เงินสด' : ''} − ค่าใช้จ่าย</small></div>
   </div>
   <div class="two">
     <div class="card"><div class="card-h"><h2>💸 เงินออก</h2><span class="muted sm">แยกช่องทาง</span></div>
@@ -1504,22 +1529,22 @@ async function renderBills() {
         ${shopExp ? `<tr><td>ค่าใช้จ่ายการขาย <span class="sub">· ${shopExpSales.map(x => esc(x.sale_no)).join(', ')}</span></td><td class="out-t">${money(shopExp)}</td></tr>` : ''}
         <tr class="tot"><td>รวมเงินออก</td><td class="out-t">${money(outTotal)}</td></tr>
       </table></div>
-    <div class="card"><div class="card-h"><h2>💰 เงินเข้า</h2><span class="muted sm">เฉพาะที่ได้รับเงินแล้ว</span></div>
+    ${V.sales ? `<div class="card"><div class="card-h"><h2>💰 เงินเข้า</h2><span class="muted sm">เฉพาะที่ได้รับเงินแล้ว</span></div>
       <table class="brk">
         ${d.paid.map(x => `<tr><td>${x.buyer_type === 'refinery' ? '🏭 รับเงินจากโรงสกัด' : '🏪 ขายร้านรับซื้อ'} <span class="sub">· ${esc(x.sale_no)} ${esc(x.buyer_name)}${bkkDate(x.created_at) !== S.billsDate ? ` (ขายเมื่อ ${shortTh(bkkDate(x.created_at))})` : ''}</span></td><td class="in-t">${money(saleReceived(x))}</td></tr>
           <tr><td><span class="sub">↳ ${esc(PAY_TH[x.pay_method] || x.pay_method || '-')}</span></td><td><span class="sub">${money(saleReceived(x))}</span></td></tr>`).join('') || '<tr><td class="muted">ยังไม่มีเงินเข้า</td><td></td></tr>'}
         <tr class="tot"><td>รวมเงินเข้า</td><td class="in-t">${money(inTotal)}</td></tr>
-      </table></div>
+      </table></div>` : ''}
   </div>
-  <div class="card"><div class="card-h"><h2>⏳ รอรับเงิน</h2><span class="muted sm">ทุกวัน ไม่ใช่แค่วันนี้</span></div>
+  ${V.pending ? `<div class="card"><div class="card-h"><h2>⏳ รอรับเงิน</h2><span class="muted sm">ทุกวัน ไม่ใช่แค่วันนี้</span></div>
     <div class="filter"><button data-wf="all" class="${waitFilter === 'all' ? 'on' : ''}">ทั้งหมด ${money(sumP(pend))}</button><button data-wf="shop" class="${waitFilter === 'shop' ? 'on' : ''}">🏪 ร้านรับซื้อ ${money(sumP(pendShop))}</button><button data-wf="ref" class="${waitFilter === 'ref' ? 'on' : ''}">🏭 โรงสกัด ${money(sumP(pendRef))}</button></div>
     ${waitList.map(x => { const od = x.due_date && x.due_date < bkkDate(); return `<div class="wait-row" data-wsale="${x.id}"><div><b>${x.buyer_type === 'refinery' ? '🏭' : '🏪'} ${esc(x.sale_no)}</b> ${esc(x.buyer_name)}${x.lot_no ? ` <span class="tag">ล็อต ${esc(x.lot_no)}</span>` : ''}<br><span class="sm muted">ขาย${bkkDate(x.created_at) === bkkDate() ? 'วันนี้' : 'เมื่อ ' + shortTh(bkkDate(x.created_at))} · ${esc(x.lines_label || '')}</span>${notesHtml(x.id)}</div>
       <div class="right"><b>${money(x.exp)}</b><br>${x.due_date ? `<span class="pill ${od ? 'bad' : 'warn'}">${od ? `เลยกำหนด ${dayDiff(x.due_date)} วัน (${shortTh(x.due_date)})` : `กำหนด ${shortTh(x.due_date)}`}</span>` : '<span class="pill">ไม่ได้ระบุวัน</span>'}</div></div>`; }).join('')}
     ${waitFilter !== 'shop' ? openNoAmt.map(r => `<div class="wait-row" style="opacity:.75"><div><b>🏭 ${esc(r.lot_no)}</b> ${esc(r.refinery_name)} <span class="tag">ยังไม่มียอด</span><br><span class="sm muted">ส่ง${bkkDate(r.created_at) === bkkDate() ? 'วันนี้' : 'เมื่อ ' + shortTh(bkkDate(r.created_at))} · ${gram(r.sent_weight)} ก. · ${r.status === 'sent' ? 'รอผลวิเคราะห์' : 'ได้ผลแล้ว รอสรุปขาย'}</span></div><div class="right"><b>—</b><br><span class="pill">${r.status === 'sent' ? 'รอผล' : 'รอสรุปขาย'}</span></div></div>`).join('') : ''}
     ${!waitList.length && !(waitFilter !== 'shop' && openNoAmt.length) ? '<p class="muted center-t">ไม่มีรายการรอรับเงิน</p>' : ''}
-  </div>
+  </div>` : ''}
   <div class="card"><div class="card-h"><h2>รายการ${S.billsDate === bkkDate() ? 'วันนี้' : ''}</h2><span class="muted sm">${ev.length} รายการ</span></div>
-    <div class="filter">${[['all', 'ทั้งหมด'], ['buy', 'รับซื้อ'], ['sell', 'ขาย/รับเงิน'], ['ref', 'โรงสกัด'], ['melt', 'หลอม'], ['noted', 'มีหมายเหตุ']].map(f => `<button data-sf="${f[0]}" class="${sumFilter === f[0] ? 'on' : ''}">${f[1]}</button>`).join('')}</div>
+    <div class="filter">${[['all', 'ทั้งหมด'], ['buy', 'รับซื้อ'], ...(V.sales ? [['sell', 'ขาย/รับเงิน']] : []), ['ref', 'โรงสกัด'], ['melt', 'หลอม'], ['noted', 'มีหมายเหตุ']].map(f => `<button data-sf="${f[0]}" class="${sumFilter === f[0] ? 'on' : ''}">${f[1]}</button>`).join('')}</div>
     ${local.map(r => `<div class="tl"><div class="ic buy">⬆</div><div class="body"><b>รับซื้อ ${esc(r.bill_no)}</b> <span class="pill warn">รอส่ง</span> <span class="muted sm">${thTime(r.created_at)} · ${esc(r.payload.staff_code || '')}</span><br><span class="sm">${esc((r.payload.customer || {}).name || '')}</span></div><div class="amt out-t">−${money(r.payload.total)}</div></div>`).join('')}
     ${evShown.map(e => `<div class="tl"><div class="ic ${ICON[e.kind][0]}">${ICON[e.kind][1]}</div><div class="body"><button class="linkish" data-open="${e.ref}:${e.id}"><b ${e.voided ? 'style="text-decoration:line-through"' : ''}>${esc(e.title)}</b></button>${e.voided ? ' <span class="pill bad">ยกเลิก</span>' : ''} <span class="muted sm">${thTime(e.at)}${e.staff ? ' · ' + esc(e.staff) : ''}</span><br><span class="sm">${esc(e.sub)}</span>
       ${notesHtml(e.id)}<button class="addnote" data-note="${e.ref}:${e.id}" data-ntitle="${esc(e.title)}">+ เพิ่มหมายเหตุ</button></div>${amtHtml(e)}</div>`).join('') || (local.length ? '' : '<p class="muted center-t">ไม่มีรายการ</p>')}
@@ -1577,12 +1602,12 @@ async function renderMonth() {
   catch (e) { toast(errText(e), 'err'); S.sumMode = 'day'; return renderBills(); }
   if (S.screen !== 'bills') return;
   monthCache = d;
-  const M = metals(), today = bkkDate(), mon = S.sumMonth;
+  const M = metals(), today = bkkDate(), mon = S.sumMonth, V = d.view || { sales: true, profit: true, pending: true }, all = V.sales && V.profit && V.pending;
   const days = d.days.map(x => ({ ...x, out: num(x.buy) + num(x.expense), inc: num(x.income), closed: !num(x.bills) && !num(x.income) && !num(x.expense) }));
   const totOut = days.reduce((t, x) => t + x.out, 0), totIn = days.reduce((t, x) => t + x.inc, 0), totExp = days.reduce((t, x) => t + num(x.expense), 0);
   const bills = days.reduce((t, x) => t + num(x.bills), 0), incN = d.sales.reduce((t, s) => t + num(s.n), 0);
   const profit = num(d.cur.profit), saleAmt = d.sales.reduce((t, s) => t + num(s.amount), 0);
-  const pend = d.pending, pendTot = num(pend.shop) + num(pend.refinery);
+  const pend = d.pending || {}, pendTot = num(pend.shop) + num(pend.refinery);
   // กราฟ
   const W = 1180, H = 220, pad = 34, n = days.length, bw = (W - pad * 2) / n, maxv = Math.max(1, ...days.map(x => Math.max(x.out, x.inc)));
   const grid = [1, 2, 3, 4].map(k => { const y = H - 30 - (H - 50) * k / 4; return `<line x1="${pad}" x2="${W - pad}" y1="${y}" y2="${y}" stroke="#EFEBE3"/><text x="${pad - 4}" y="${y + 3}" font-size="10" text-anchor="end" fill="#8C8578">${Math.round(maxv * k / 4 / 1000)}k</text>`; }).join('');
@@ -1603,52 +1628,52 @@ async function renderMonth() {
   const prevLabel = monLabel(shiftMon(mon, -1));
   $('.main').innerHTML = `<h1 class="screen-title">สรุป ${modeToggle()}
     <span class="mon"><button class="btn ghost sm" id="mPrev" aria-label="เดือนก่อน">‹</button><b>${monLabel(mon)}</b><button class="btn ghost sm" id="mNext" aria-label="เดือนถัดไป" ${mon >= today.slice(0, 7) ? 'disabled' : ''}>›</button></span>
-    <button class="btn ghost sm" id="mXls">⬇ ดาวน์โหลด Excel</button></h1>
+    ${isOwner() || all ? '<button class="btn ghost sm" id="mXls">⬇ ดาวน์โหลด Excel</button>' : ''}</h1>
   <div class="flow">
-    <div class="kpi in"><span>💰 เงินเข้าทั้งเดือน</span><b>+${money(totIn)}</b><small>ขาย/รับเงิน ${incN} รายการ</small></div>
+    ${V.sales ? `<div class="kpi in"><span>💰 เงินเข้าทั้งเดือน</span><b>+${money(totIn)}</b><small>ขาย/รับเงิน ${incN} รายการ</small></div>` : ''}
     <div class="kpi out"><span>💸 เงินออกทั้งเดือน</span><b>−${money(totOut)}</b><small>รับซื้อ ${bills} บิล + ค่าใช้จ่าย ${money(totExp)}</small></div>
-    <div class="kpi"><span>สุทธิ (กระแสเงินสด)</span><b class="${totIn - totOut >= 0 ? 'okc' : 'bad'}">${totIn - totOut >= 0 ? '+' : '−'}${money(Math.abs(totIn - totOut))}</b><small>${totIn - totOut < 0 ? 'ส่วนใหญ่ไปอยู่ในสต๊อก' : 'เงินเข้ามากกว่าออก'}</small></div>
-    <div class="kpi"><span>📈 กำไรจากการขาย</span><b class="${profit >= 0 ? 'okc' : 'bad'}">${profit >= 0 ? '+' : '−'}${money(Math.abs(profit))}</b><small>ยอดขาย − ทุน − ค่าใช้จ่าย${saleAmt ? ` · ${(profit / saleAmt * 100).toFixed(1)}%` : ''}</small></div>
-    <div class="kpi cash"><span>สต๊อกคงเหลือ (ราคาทุน)</span><b>${money(d.stock.cost)}</b><small>ณ ตอนนี้ · ทอง ${gram(d.stock.gold_g)} ก. · เงิน ${gram(d.stock.silver_g)} ก.</small></div>
+    ${V.sales ? `<div class="kpi"><span>สุทธิ (กระแสเงินสด)</span><b class="${totIn - totOut >= 0 ? 'okc' : 'bad'}">${totIn - totOut >= 0 ? '+' : '−'}${money(Math.abs(totIn - totOut))}</b><small>${totIn - totOut < 0 ? 'ส่วนใหญ่ไปอยู่ในสต๊อก' : 'เงินเข้ามากกว่าออก'}</small></div>` : ''}
+    ${V.profit ? `<div class="kpi"><span>📈 กำไรจากการขาย</span><b class="${profit >= 0 ? 'okc' : 'bad'}">${profit >= 0 ? '+' : '−'}${money(Math.abs(profit))}</b><small>ยอดขาย − ทุน − ค่าใช้จ่าย${saleAmt ? ` · ${(profit / saleAmt * 100).toFixed(1)}%` : ''}</small></div>
+    <div class="kpi cash"><span>สต๊อกคงเหลือ (ราคาทุน)</span><b>${money(d.stock.cost)}</b><small>ณ ตอนนี้ · ทอง ${gram(d.stock.gold_g)} ก. · เงิน ${gram(d.stock.silver_g)} ก.</small></div>` : `<div class="kpi cash"><span>สต๊อกคงเหลือ</span><b>${gram(d.stock.gold_g)} ก.</b><small>ทอง · เงิน ${gram(d.stock.silver_g)} ก.</small></div>`}
   </div>
-  <div class="card"><div class="card-h"><h2>เงินเข้า / เงินออก รายวัน</h2><div class="legend"><span><i style="background:#E08A80"></i>เงินออก</span><span><i style="background:#4FA373"></i>เงินเข้า</span></div></div>
+  <div class="card"><div class="card-h"><h2>${V.sales ? 'เงินเข้า / เงินออก' : 'เงินออก'} รายวัน</h2><div class="legend"><span><i style="background:#E08A80"></i>เงินออก</span>${V.sales ? '<span><i style="background:#4FA373"></i>เงินเข้า</span>' : ''}</div></div>
     ${svg}<p class="muted sm">กดแท่งของวันไหน เพื่อเปิดสรุปของวันนั้น</p></div>
   <div class="two">
     <div class="card"><div class="card-h"><h2>รายวัน</h2><span class="muted sm">กดแถวเพื่อดูวันนั้น</span></div>
-      <div class="scroll"><table class="mtbl"><thead><tr><th>วัน</th><th>บิล</th><th>รับซื้อ</th><th>ขาย/รับเงิน</th><th>สุทธิ</th><th></th></tr></thead><tbody>
+      <div class="scroll"><table class="mtbl"><thead><tr><th>วัน</th><th>บิล</th><th>รับซื้อ</th>${V.sales ? '<th>ขาย/รับเงิน</th><th>สุทธิ</th>' : ''}<th></th></tr></thead><tbody>
       ${days.filter(x => x.date <= today).map(x => { const dn = +x.date.slice(8), net = x.inc - x.out;
-        return x.closed ? `<tr class="closed" data-day="${x.date}"><td>${dn} ${TH_MON[+mon.slice(5) - 1]}</td><td colspan="4">ไม่มีรายการ</td><td>›</td></tr>`
-          : `<tr data-day="${x.date}"><td>${dn} ${TH_MON[+mon.slice(5) - 1]}</td><td>${x.bills}</td><td class="out-t">${money(x.out)}</td><td class="in-t">${x.inc ? money(x.inc) : '–'}</td><td class="${net >= 0 ? 'in-t' : 'out-t'}">${net >= 0 ? '+' : '−'}${money(Math.abs(net))}</td><td>›</td></tr>`; }).join('')}
-      </tbody><tfoot><tr><td>รวม</td><td>${bills}</td><td class="out-t">${money(totOut)}</td><td class="in-t">${money(totIn)}</td><td class="${totIn - totOut >= 0 ? 'in-t' : 'out-t'}">${totIn - totOut >= 0 ? '+' : '−'}${money(Math.abs(totIn - totOut))}</td><td></td></tr></tfoot></table></div></div>
+        return x.closed ? `<tr class="closed" data-day="${x.date}"><td>${dn} ${TH_MON[+mon.slice(5) - 1]}</td><td colspan="${V.sales ? 4 : 2}">ไม่มีรายการ</td><td>›</td></tr>`
+          : `<tr data-day="${x.date}"><td>${dn} ${TH_MON[+mon.slice(5) - 1]}</td><td>${x.bills}</td><td class="out-t">${money(x.out)}</td>${V.sales ? `<td class="in-t">${x.inc ? money(x.inc) : '–'}</td><td class="${net >= 0 ? 'in-t' : 'out-t'}">${net >= 0 ? '+' : '−'}${money(Math.abs(net))}</td>` : ''}<td>›</td></tr>`; }).join('')}
+      </tbody><tfoot><tr><td>รวม</td><td>${bills}</td><td class="out-t">${money(totOut)}</td>${V.sales ? `<td class="in-t">${money(totIn)}</td><td class="${totIn - totOut >= 0 ? 'in-t' : 'out-t'}">${totIn - totOut >= 0 ? '+' : '−'}${money(Math.abs(totIn - totOut))}</td>` : ''}<td></td></tr></tfoot></table></div></div>
     <div>
       <div class="card"><div class="card-h"><h2>รับซื้อแยกตาม %</h2><span class="muted sm">${Object.entries(wByMetal).map(([k, w]) => `${esc(M[k] ? M[k].label : k)} ${gram(w)} ก.`).join(' · ') || '-'}</span></div>
         <div class="pct-bars">${pctRows.map(p => `<div class="pb"><span>${esc(M[p.metal] ? M[p.metal].label : p.metal)} ${num(p.pct)}%</span><div><i style="width:${(num(p.weight) / pmax * 100).toFixed(1)}%;${p.metal === 'silver' ? 'background:#9AA5B1' : ''}"></i></div><b>${gram(p.weight)} ก.</b></div>`).join('') || '<p class="muted">ยังไม่มีการรับซื้อ</p>'}</div></div>
-      <div class="card"><div class="card-h"><h2>การขายในเดือน</h2><span class="muted sm">${incN} รายการ</span></div>
+      ${V.sales ? `<div class="card"><div class="card-h"><h2>การขายในเดือน</h2><span class="muted sm">${incN} รายการ</span></div>
         <table class="brk">
           <tr><td>🏪 ร้านรับซื้อ <span class="sub">· ${num(shop.n)} รายการ · ${gram(shop.weight)} ก.</span></td><td class="in-t">${money(shop.amount)}</td></tr>
-          <tr><td><span class="sub">↳ กำไร</span></td><td><span class="sub ${num(shop.profit) >= 0 ? 'okc' : 'bad'}">${num(shop.profit) >= 0 ? '+' : '−'}${money(Math.abs(num(shop.profit)))}</span></td></tr>
+          ${V.profit ? `<tr><td><span class="sub">↳ กำไร</span></td><td><span class="sub ${num(shop.profit) >= 0 ? 'okc' : 'bad'}">${num(shop.profit) >= 0 ? '+' : '−'}${money(Math.abs(num(shop.profit)))}</span></td></tr>` : ''}
           <tr><td>🏭 โรงสกัด <span class="sub">· ${num(refi.n)} ล็อต · ${gram(refi.weight)} ก.</span></td><td class="in-t">${money(refi.amount)}</td></tr>
-          <tr><td><span class="sub">↳ กำไร${num(refi.fees) ? ` (หักค่าสกัด ${money(refi.fees)})` : ''}</span></td><td><span class="sub ${num(refi.profit) >= 0 ? 'okc' : 'bad'}">${num(refi.profit) >= 0 ? '+' : '−'}${money(Math.abs(num(refi.profit)))}</span></td></tr>
+          ${V.profit ? `<tr><td><span class="sub">↳ กำไร${num(refi.fees) ? ` (หักค่าสกัด ${money(refi.fees)})` : ''}</span></td><td><span class="sub ${num(refi.profit) >= 0 ? 'okc' : 'bad'}">${num(refi.profit) >= 0 ? '+' : '−'}${money(Math.abs(num(refi.profit)))}</span></td></tr>` : ''}
           ${num(d.extra.silver_returned_g) ? `<tr><td><span class="sub">↳ แร่เงินรับคืนเข้าสต๊อก</span></td><td><span class="sub">${gram(d.extra.silver_returned_g)} ก.</span></td></tr>` : ''}
-          <tr class="tot"><td>รวมกำไรจากการขาย</td><td class="${profit >= 0 ? 'okc' : 'bad'}">${profit >= 0 ? '+' : '−'}${money(Math.abs(profit))}</td></tr>
-        </table></div>
+          ${V.profit ? `<tr class="tot"><td>รวมกำไรจากการขาย</td><td class="${profit >= 0 ? 'okc' : 'bad'}">${profit >= 0 ? '+' : '−'}${money(Math.abs(profit))}</td></tr>` : `<tr class="tot"><td>รวมยอดขาย</td><td class="in-t">${money(saleAmt)}</td></tr>`}
+        </table></div>` : ''}
     </div>
   </div>
   <div class="three">
-    <div class="card"><div class="card-h"><h2>⏳ รอรับเงิน ณ สิ้นเดือน</h2></div>
+    ${V.pending ? `<div class="card"><div class="card-h"><h2>⏳ รอรับเงิน ณ สิ้นเดือน</h2></div>
       <table class="brk"><tr><td>🏪 ร้านรับซื้อ <span class="sub">· ${pend.shop_n} รายการ</span></td><td>${money(pend.shop)}</td></tr><tr><td>🏭 โรงสกัด <span class="sub">· ${pend.refinery_n} รายการ</span></td><td>${money(pend.refinery)}</td></tr>
-      ${num(pend.overdue) ? `<tr><td><span class="sub bad">↳ เลยกำหนด</span></td><td><span class="sub bad">${money(pend.overdue)}</span></td></tr>` : ''}<tr class="tot"><td>รวม</td><td>${money(pendTot)}</td></tr></table></div>
+      ${num(pend.overdue) ? `<tr><td><span class="sub bad">↳ เลยกำหนด</span></td><td><span class="sub bad">${money(pend.overdue)}</span></td></tr>` : ''}<tr class="tot"><td>รวม</td><td>${money(pendTot)}</td></tr></table></div>` : ''}
     <div class="card"><div class="card-h"><h2>👤 พนักงาน</h2><span class="muted sm">บิลรับซื้อ</span></div>
       <table class="brk">${d.staff.map(s => `<tr><td>${esc(s.staff_code)}-${esc(s.nickname || '')} <span class="sub">· ${s.bills} บิล · ยกเลิก ${s.voided}</span></td><td>${money(s.total)}</td></tr>`).join('') || '<tr><td class="muted">ยังไม่มีบิล</td><td></td></tr>'}
       <tr class="tot"><td>รวม ${bills} บิล</td><td>${money(d.cur.buy)}</td></tr></table></div>
     <div class="card"><div class="card-h"><h2>📊 เทียบเดือนก่อน</h2><span class="muted sm">${prevLabel}</span></div>
-      <table class="brk"><tr><td>ยอดรับซื้อ</td><td>${cmp(d.cur.buy, d.prev.buy)}</td></tr><tr><td>จำนวนบิล</td><td>${cmp(d.cur.bills, d.prev.bills)}</td></tr><tr><td>กำไรจากการขาย</td><td>${cmp(d.cur.profit, d.prev.profit)}</td></tr>
+      <table class="brk"><tr><td>ยอดรับซื้อ</td><td>${cmp(d.cur.buy, d.prev.buy)}</td></tr><tr><td>จำนวนบิล</td><td>${cmp(d.cur.bills, d.prev.bills)}</td></tr>${V.profit ? `<tr><td>กำไรจากการขาย</td><td>${cmp(d.cur.profit, d.prev.profit)}</td></tr>` : ''}
       <tr><td>ลูกค้าใหม่</td><td>${d.extra.new_customers} คน</td></tr><tr><td>% สูญเสียตอนหลอม (เฉลี่ย)</td><td>${d.extra.melt_loss_pct != null ? num(d.extra.melt_loss_pct).toFixed(2) + '%' : '–'}</td></tr></table></div>
   </div>`;
   bindModeToggle();
   $('#mPrev').onclick = () => { S.sumMonth = shiftMon(mon, -1); renderMonth(); };
   $('#mNext').onclick = () => { S.sumMonth = shiftMon(mon, 1); renderMonth(); };
-  $('#mXls').onclick = () => exportMonth(d);
+  const mx = $('#mXls'); if (mx) mx.onclick = () => exportMonth(d);
   $$('[data-day]').forEach(el => el.onclick = () => { if (el.dataset.day > today) return; S.billsDate = el.dataset.day; S.sumMode = 'day'; renderBills(); });
 }
 function exportMonth(d) {
@@ -1738,7 +1763,7 @@ let setTab = 'prices';
 function renderSettings() {
   if (!isOwner()) return go('buy');
   const st = deepCopy(S.settings), P = st.prices, shop = st.shop, rc = st.receipt || {};
-  const tabs = [['prices', 'ราคา'], ['shop', 'ข้อมูลร้าน'], ['receipt', 'ใบรับซื้อ'], ['cancel', 'ยกเลิกบิล'], ['melt', 'หลอม'], ['sale', 'ขาย & ลิ้นชัก']];
+  const tabs = [['prices', 'ราคา'], ['shop', 'ข้อมูลร้าน'], ['receipt', 'ใบรับซื้อ'], ['cancel', 'ยกเลิกบิล'], ['melt', 'หลอม'], ['sale', 'ขาย · ลิ้นชัก · สิทธิ์ดู']];
   let body = '';
   if (setTab === 'prices') {
     body = `<div class="card">
@@ -1761,15 +1786,21 @@ function renderSettings() {
       ${[['name', 'ชื่อร้าน'], ['name2', 'ชื่อรอง'], ['branch', 'สาขา'], ['address', 'ที่อยู่'], ['phone', 'โทร'], ['line', 'LINE'], ['footer', 'ข้อความท้ายใบ']].map(([f, l]) => `<label>${l}<input data-shop="${f}" value="${esc(shop[f] || '')}"></label>`).join('')}
       <button class="btn gold block" id="saveShop">บันทึกข้อมูลร้าน</button></div>`;
   } else if (setTab === 'sale') {
-    const sc = saleCfg();
+    const sc = saleCfg(), sv = Object.assign({ sales: false, profit: false, pending: false }, (S.settings && S.settings.staff_view) || {});
     body = `<div class="card"><div class="card-h"><h2>สิทธิ์การขาย</h2></div>
       <label class="switch"><input type="checkbox" id="slStaff" ${sc.staff_can_sell ? 'checked' : ''}> <b>อนุญาตให้พนักงานบันทึกการขายและรับเงิน</b></label>
       <p class="muted sm">ปิดไว้ = บันทึกการขายได้เฉพาะเจ้าของ · ยกเลิกการขายได้เฉพาะเจ้าของเสมอ</p>
       <button class="btn gold block" id="saveSl">บันทึก</button></div>
       <div class="card"><div class="card-h"><h2>เงินสดในลิ้นชัก</h2></div>
       <label>เงินตั้งต้นในลิ้นชักทุกวัน (บาท)<input id="drFloat" inputmode="decimal" value="${esc(((S.settings && S.settings.drawer) || {}).float ?? 50000)}"></label>
-      <p class="muted sm">ใช้คำนวณ "เงินสดในลิ้นชัก (คาด)" ในหน้าสรุป = เงินตั้งต้น + เงินสดเข้า − เงินสดออก (รับซื้อเงินสด, ค่าหลอม, ค่าขนส่ง, ค่าใช้จ่ายการขาย)</p>
-      <button class="btn gold block" id="saveDr">บันทึก</button></div>`;
+      <p class="muted sm">เงินสดในลิ้นชักเริ่มวันละเท่านี้ทุกวัน แล้วลดลงทุกครั้งที่จ่ายรับซื้อเป็นเงินสด (ยืนยันด้วย PIN) และค่าหลอม/ค่าขนส่ง/ค่าใช้จ่ายการขาย · เพิ่มขึ้นเมื่อขายได้เงินสด · ตอนยืนยันบิลจะเห็นยอดเงินสดคงเหลือ และเตือนถ้าเงินในลิ้นชักไม่พอ</p>
+      <button class="btn gold block" id="saveDr">บันทึก</button></div>
+      <div class="card"><div class="card-h"><h2>สิ่งที่พนักงานเห็นในหน้าสรุป</h2></div>
+      <label class="switch"><input type="checkbox" id="svSales" ${sv.sales ? 'checked' : ''}> <b>ยอดขาย / เงินเข้า</b></label>
+      <label class="switch"><input type="checkbox" id="svProfit" ${sv.profit ? 'checked' : ''}> <b>กำไร และทุนของ</b></label>
+      <label class="switch"><input type="checkbox" id="svPending" ${sv.pending ? 'checked' : ''}> <b>ยอดรอรับเงิน (ร้านรับซื้อ / โรงสกัด)</b></label>
+      <p class="muted sm">ปิดไว้ = พนักงานไม่เห็นข้อมูลนั้นทั้งในสรุปรายวันและรายเดือน (ระบบไม่ส่งข้อมูลไปที่เครื่องพนักงานเลย) · พนักงานยังเห็นยอดรับซื้อ เงินออก และเงินสดในลิ้นชักเสมอ · เจ้าของเห็นทุกอย่าง</p>
+      <button class="btn gold block" id="saveSv">บันทึก</button></div>`;
   } else if (setTab === 'melt') {
     const m = meltCfg();
     body = `<div class="card"><div class="card-h"><h2>ค่าตั้งต้นการหลอม</h2></div>
@@ -1827,6 +1858,7 @@ function renderSettings() {
   } else if (setTab === 'sale') {
     $('#saveSl').onclick = (ev) => save('sale', { staff_can_sell: $('#slStaff').checked }, ev.target);
     $('#saveDr').onclick = (ev) => save('drawer', { float: Math.max(0, num($('#drFloat').value)) }, ev.target);
+    $('#saveSv').onclick = (ev) => save('staff_view', { sales: $('#svSales').checked, profit: $('#svProfit').checked, pending: $('#svPending').checked }, ev.target);
   } else if (setTab === 'melt') {
     $('#saveM').onclick = (ev) => save('melt', { default_cost: Math.max(0, num($('#mCost').value)), tolerance_pct: Math.max(0, num($('#mTol').value)), loss_warn_pct: Math.max(0, num($('#mLoss').value)) }, ev.target);
   } else if (setTab === 'cancel') {

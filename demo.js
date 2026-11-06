@@ -77,7 +77,7 @@
     },
     logout: ({ p_token }) => { const a = auth(p_token); db.sessions.find(x => x.token === p_token).revoked_at = new Date().toISOString(); log(a.s, a.dev, 'logout'); return null; },
     get_settings: ({ p_token }) => { auth(p_token); return { settings: db.settings, server_time: new Date().toISOString() }; },
-    save_setting: ({ p_token, p_key, p_value }) => { const a = owner(p_token); if (!['shop', 'prices', 'receipt', 'cancel', 'melt', 'sale'].includes(p_key)) err('BAD_KEY'); db.settings[p_key] = p_value; log(a.s, a.dev, 'save_setting', { key: p_key }); return null; },
+    save_setting: ({ p_token, p_key, p_value }) => { const a = owner(p_token); if (!['shop', 'prices', 'receipt', 'cancel', 'melt', 'sale', 'drawer', 'staff_view'].includes(p_key)) err('BAD_KEY'); db.settings[p_key] = p_value; log(a.s, a.dev, 'save_setting', { key: p_key }); return null; },
     create_bill: ({ p_token, p_bill }) => {
       const a = auth(p_token);
       const ex = db.bills.find(b => b.id === p_bill.id); if (ex) return { id: ex.id, bill_no: ex.bill_no, duplicate: true };
