@@ -4,7 +4,7 @@
 'use strict';
 const CFG = window.DD_CONFIG || {};
 const DEMO = !CFG.SUPABASE_URL;
-const APP_VERSION = '1.10.0';
+const APP_VERSION = '1.11.0';
 
 // ---------------------------------------------------------------- utils
 const $ = (s, el = document) => el.querySelector(s);
@@ -1760,10 +1760,49 @@ function renderPin() {
 
 // ---------------------------------------------------------------- settings (owner)
 let setTab = 'prices';
+// ---------- ตั้งค่าแจ้งเตือน LINE OA ----------
+const LINE_ST = { OK: '✅ ส่งสำเร็จ', NO_TOKEN: 'ยังไม่ได้ใส่ Channel access token', OFF: 'ปิดการแจ้งเตือนอยู่', BAD_TOKEN: '❌ Token ไม่ถูกต้อง — คัดลอกใหม่จาก LINE Developers',
+  QUOTA: '❌ ข้อความเกินโควตาของเดือนนี้', SEND_FAIL: '❌ ส่งไม่ได้ — เซิร์ฟเวอร์ติดต่อ LINE ไม่ได้' };
+async function lineTab() {
+  const box = $('#lineBox'); if (!box) return;
+  if (DEMO || !S.session.token) { box.innerHTML = '<div class="card"><p class="muted">ใช้ได้เมื่อเชื่อม Supabase และออนไลน์อยู่</p></div>'; return; }
+  let c; try { c = await api('line_get', { p_token: S.session.token }); } catch (e) { box.innerHTML = `<div class="card"><p class="bad">${esc(errText(e))}</p><p class="muted sm">ถ้าขึ้นว่าไม่พบฟังก์ชัน ให้รัน schema.sql ตัวใหม่ใน Supabase ก่อน</p></div>`; return; }
+  if (!$('#lineBox')) return;
+  const ev = c.events || {}, st = c.last_status ? `${LINE_ST[c.last_status] || c.last_status} · ${thDateTime(c.last_at)}` : 'ยังไม่เคยส่ง';
+  box.innerHTML = `<div class="card"><div class="card-h"><h2>แจ้งเตือนเจ้าของผ่าน LINE</h2><span class="muted sm">ส่งล่าสุด: ${esc(st)}</span></div>
+    ${c.http_ok ? '' : '<div class="banner warn" style="display:block">เซิร์ฟเวอร์ยังส่งข้อมูลออกไม่ได้ — ไปที่ Supabase → Database → Extensions ค้นหา http แล้วเปิด จากนั้นรัน schema.sql อีกครั้ง</div>'}
+    <label class="switch"><input type="checkbox" id="lnEn" ${c.enabled ? 'checked' : ''}> <b>เปิดการแจ้งเตือน LINE</b></label>
+    <label>Channel access token (long-lived)<input id="lnTok" type="password" autocomplete="off" placeholder="${c.has_token ? 'ใส่แล้ว ' + esc(c.token_hint) + ' — เว้นว่างไว้ถ้าไม่เปลี่ยน' : 'วางจาก LINE Developers → Messaging API'}"></label>
+    <p class="muted sm">Token เก็บไว้ในเซิร์ฟเวอร์ส่วนที่แอปอ่านไม่ได้ พนักงานและเครื่องอื่นมองไม่เห็น</p>
+    <label>ส่งถึงใคร</label>
+    <label class="switch"><input type="radio" name="lnTo" value="all" ${c.to ? '' : 'checked'}> ทุกคนที่แอดเพื่อน OA นี้ <span class="muted sm">(แนะนำ — ใช้ OA แยกสำหรับแจ้งเตือน ให้แอดเฉพาะเจ้าของ)</span></label>
+    <label class="switch"><input type="radio" name="lnTo" value="ids" ${c.to ? 'checked' : ''}> เฉพาะ User ID ที่ระบุ</label>
+    <input id="lnIds" placeholder="U1234… (ถ้าหลายคน คั่นด้วย ,)" value="${esc(c.to || '')}" style="${c.to ? '' : 'display:none'}">
+    <label>แจ้งเตือนเมื่อ</label>
+    <label class="switch"><input type="checkbox" id="lnCancel" ${ev.cancel_request !== false ? 'checked' : ''}> พนักงานขออนุมัติยกเลิกบิล</label>
+    <div class="row"><button class="btn gold" id="lnSave">บันทึก</button><button class="btn ghost" id="lnTest">ส่งข้อความทดสอบ</button></div></div>`;
+  $$('[name=lnTo]').forEach(r => r.onchange = () => { $('#lnIds').style.display = $('[name=lnTo]:checked').value === 'ids' ? '' : 'none'; });
+  $('#lnSave').onclick = async (e) => {
+    const ids = $('[name=lnTo]:checked').value === 'ids' ? $('#lnIds').value.split(',').map(x => x.trim()).filter(Boolean) : [];
+    if (ids.some(x => !/^U[0-9a-f]{32}$/.test(x))) return toast('User ID ต้องขึ้นต้นด้วย U และยาว 33 ตัวอักษร', 'err');
+    if ($('#lnEn').checked && !c.has_token && !$('#lnTok').value.trim()) return toast('ใส่ Channel access token ก่อน', 'err');
+    busy(e.target, true);
+    try {
+      await api('line_save', { p_token: S.session.token, p_channel_token: $('#lnTok').value.trim() || null, p_enabled: $('#lnEn').checked,
+        p_to: ids.join(','), p_events: { cancel_request: $('#lnCancel').checked }, p_app_url: location.origin + location.pathname });
+      toast('บันทึกแล้ว'); lineTab();
+    } catch (er) { toast(errText(er), 'err'); busy(e.target, false); }
+  };
+  $('#lnTest').onclick = async (e) => {
+    busy(e.target, true);
+    try { const r = await api('line_test', { p_token: S.session.token }); toast(LINE_ST[r.status] || r.status, r.status === 'OK' ? '' : 'err'); lineTab(); }
+    catch (er) { toast(errText(er), 'err'); busy(e.target, false); }
+  };
+}
 function renderSettings() {
   if (!isOwner()) return go('buy');
   const st = deepCopy(S.settings), P = st.prices, shop = st.shop, rc = st.receipt || {};
-  const tabs = [['prices', 'ราคา'], ['shop', 'ข้อมูลร้าน'], ['receipt', 'ใบรับซื้อ'], ['cancel', 'ยกเลิกบิล'], ['melt', 'หลอม'], ['sale', 'ขาย · ลิ้นชัก · สิทธิ์ดู']];
+  const tabs = [['prices', 'ราคา'], ['shop', 'ข้อมูลร้าน'], ['receipt', 'ใบรับซื้อ'], ['cancel', 'ยกเลิกบิล'], ['melt', 'หลอม'], ['sale', 'ขาย · ลิ้นชัก · สิทธิ์ดู'], ['line', 'LINE แจ้งเตือน']];
   let body = '';
   if (setTab === 'prices') {
     body = `<div class="card">
@@ -1809,6 +1848,8 @@ function renderSettings() {
       <p class="muted sm">ตัวอย่าง 0.5 = ถ้าคาดว่าได้เนื้อทอง 100 ก. แล้ววัดได้ 99.5–100.5 ก. ถือว่าอยู่ในเกณฑ์ พร้อมขาย</p>
       <label>เตือนเมื่อน้ำหนักหายตอนหลอมเกิน (%)<input id="mLoss" inputmode="decimal" value="${esc(m.loss_warn_pct)}"></label>
       <button class="btn gold block" id="saveM">บันทึก</button></div>`;
+  } else if (setTab === 'line') {
+    body = `<div id="lineBox"><div class="card"><p class="muted">กำลังโหลด…</p></div></div>`;
   } else if (setTab === 'cancel') {
     const c = cancelCfg();
     body = `<div class="card">
@@ -1859,6 +1900,8 @@ function renderSettings() {
     $('#saveSl').onclick = (ev) => save('sale', { staff_can_sell: $('#slStaff').checked }, ev.target);
     $('#saveDr').onclick = (ev) => save('drawer', { float: Math.max(0, num($('#drFloat').value)) }, ev.target);
     $('#saveSv').onclick = (ev) => save('staff_view', { sales: $('#svSales').checked, profit: $('#svProfit').checked, pending: $('#svPending').checked }, ev.target);
+  } else if (setTab === 'line') {
+    lineTab();
   } else if (setTab === 'melt') {
     $('#saveM').onclick = (ev) => save('melt', { default_cost: Math.max(0, num($('#mCost').value)), tolerance_pct: Math.max(0, num($('#mTol').value)), loss_warn_pct: Math.max(0, num($('#mLoss').value)) }, ev.target);
   } else if (setTab === 'cancel') {
