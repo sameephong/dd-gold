@@ -286,3 +286,28 @@ h2{font-size:18px}
 .two>*{min-width:0}
 @media (max-width:480px){ .mtbl{font-size:12.5px} .mtbl td,.mtbl th{padding:6px 3px} }
 svg .bar{cursor:pointer} svg .bar:hover rect:first-child{fill:#FFFBEF}
+
+/* กระดิ่งแจ้งเตือน */
+.bellbtn{position:relative;width:40px;height:40px;border-radius:10px;border:1px solid #4A443A;background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none}
+.bellbtn svg{width:22px;height:22px;stroke:#F6F4EF;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.bellbtn .badge{top:-6px;right:-6px}
+.bellbtn.ring{border-color:var(--gold)} .bellbtn.ring svg{stroke:var(--gold);animation:bellshake 2.4s ease-in-out infinite}
+@keyframes bellshake{0%,80%,100%{transform:rotate(0)}84%{transform:rotate(14deg)}88%{transform:rotate(-12deg)}92%{transform:rotate(8deg)}96%{transform:rotate(-4deg)}}
+.bell-h{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+.bell-list{max-height:60vh;overflow:auto;border:1px solid var(--line);border-radius:12px}
+.bell-it{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-bottom:1px solid var(--line)}
+.bell-it:last-child{border-bottom:0} .bell-it.unread{background:#FFF9EA}
+.bell-it .bt{flex:1;min-width:0} .bell-it .bt b{font-size:15px}
+.bdot{width:34px;height:34px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700}
+.bdot.ok{background:#3E8E5E}.bdot.no{background:#C0473B}.bdot.wait{background:#D9A23B}.bdot.info{background:#7B7568}
+.tagx{display:inline-block;font-size:12px;padding:2px 9px;border-radius:10px;margin-top:6px;font-weight:600}
+.tagx.ack{background:#E5F1E9;color:#2F7049}.tagx.wait{background:#FDF0D8;color:#9A6A12}
+.ack-wrap{z-index:60}
+.modal.ack{padding:0;overflow:hidden;max-width:480px;width:100%}
+.ack-h{padding:18px 22px;color:#fff;font-weight:700;font-size:20px}
+.ack-h.ok{background:#3E8E5E}.ack-h.no{background:#C0473B}
+.ack-b{padding:16px 22px 4px;font-size:15px;line-height:1.7}
+.ack-b table{width:100%;border-collapse:collapse}.ack-b td{padding:3px 0;vertical-align:top}.ack-b td:first-child{color:var(--muted);width:100px}
+.ack-note{background:#FBF4E2;border-left:4px solid var(--gold);padding:10px 12px;border-radius:6px;margin-top:10px}
+.ack-f{padding:12px 22px 18px}
+@media (max-width:899px){ .who .btn.ghost{padding:0 10px} }

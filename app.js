@@ -4,7 +4,7 @@
 'use strict';
 const CFG = window.DD_CONFIG || {};
 const DEMO = !CFG.SUPABASE_URL;
-const APP_VERSION = '1.11.0';
+const APP_VERSION = '1.12.0';
 
 // ---------------------------------------------------------------- utils
 const $ = (s, el = document) => el.querySelector(s);
@@ -194,12 +194,13 @@ function shell(title, body) {
   <header class="appbar">
     <div class="brand">${shop.logo ? `<img src="${shop.logo}" alt="">` : '<span class="logo">DD</span>'}<div><b>${esc(shop.name || 'DD หลอมทอง')}</b><small>${esc(shop.branch || '')}${DEMO ? ' · <em>โหมดทดลอง</em>' : ''}</small></div></div>
     <nav class="topnav">${tabs}</nav>
-    <div class="who"><button id="status" class="status"></button><span class="chip">${esc(me().code)} · ${esc(me().nickname)}</span><button class="btn ghost sm" id="logoutBtn">ออก</button></div>
+    <div class="who"><button class="bellbtn" id="bellBtn" title="แจ้งเตือน" aria-label="แจ้งเตือน"><svg viewBox="0 0 24 24"><path d="M6 16v-5a6 6 0 0112 0v5l2 2H4z"/><path d="M10 20a2 2 0 004 0"/></svg>${S.notif && S.notif.unread ? `<i class="badge">${S.notif.unread}</i>` : ''}</button><button id="status" class="status"></button><span class="chip">${esc(me().code)} · ${esc(me().nickname)}</span><button class="btn ghost sm" id="logoutBtn">ออก</button></div>
   </header>
   <main class="main">${reqBanner}<h1 class="screen-title">${title}</h1>${body}</main>
   <nav class="bottomnav">${tabs}</nav>`;
   $$('[data-go]').forEach(b => b.onclick = () => go(b.dataset.go));
   $('#logoutBtn').onclick = logout;
+  $('#bellBtn').onclick = bellPanel;
   $('#status').onclick = () => { if (S.session && !S.session.token) reLoginModal(); else syncNow(); };
   renderStatus();
 }
@@ -433,7 +434,7 @@ async function logout() {
   if (S.buy && S.buy.items.length && !confirm('มีบิลที่ยังไม่บันทึก ออกจากระบบเลยไหม?')) return;
   const tok = S.session && S.session.token;
   if (tok && !S.pending) api('logout', { p_token: tok }).catch(() => { });
-  saveSession(null); S.buy = null; S.loginTab = 'staff';
+  saveSession(null); S.buy = null; S.loginTab = 'staff'; S.notif = null; S.notifOk = undefined; const am = $('#ackModal'); if (am) am.remove();
   renderLogin();
 }
 
@@ -931,7 +932,7 @@ async function renderRequests() {
   $$('[data-app]').forEach(x => x.onclick = () => decideModal(pending[+x.dataset.app], true));
   $$('[data-rej]').forEach(x => x.onclick = () => decideModal(pending[+x.dataset.rej], false));
 }
-function decideModal(r, approve) {
+function decideModal(r, approve, after) {
   modal(`<h2>${approve ? 'อนุมัติยกเลิกบิล' : 'ไม่อนุมัติ'} ${esc(r.bill_no)}</h2>
     <p class="muted">${money(r.total)} บาท · ขอโดย ${esc(r.requested_code)} · เหตุผล: ${esc(r.reason)}</p>
     ${approve ? '' : '<label>เหตุผลที่ไม่อนุมัติ (พนักงานจะเห็น)<input id="dn" maxlength="200" placeholder="ไม่บังคับ"></label>'}
@@ -942,7 +943,7 @@ function decideModal(r, approve) {
     busy(ev.target, true);
     try {
       await api('decide_cancel', { p_token: S.session.token, p_req: r.id, p_approve: approve, p_pin: $('#dp').value, p_note: ($('#dn') && $('#dn').value.trim()) || null });
-      toast(approve ? `ยกเลิกบิล ${r.bill_no} แล้ว` : `ไม่อนุมัติคำขอ ${r.bill_no}`); closeModal(); renderRequests();
+      toast(approve ? `ยกเลิกบิล ${r.bill_no} แล้ว` : `ไม่อนุมัติคำขอ ${r.bill_no}`); closeModal(); refreshNotif(); if (after) after(); else renderRequests();
     } catch (e) { busy(ev.target, false); toast(errText(e), 'err'); $('#dp').value = ''; }
   };
 }
@@ -964,15 +965,114 @@ async function pollPending() {
       lastPendingSeen = n;
       if (n !== before && ['bills', 'more'].includes(S.screen) && !$('#modal')) { const sc = window.scrollY; go(S.screen); window.scrollTo(0, sc); }
       else if (n !== before) { $$('.tab[data-go=more]').forEach(t => { const old = t.querySelector('.badge'); if (old) old.remove(); if (n) t.insertAdjacentHTML('beforeend', `<i class="badge">${n}</i>`); }); }
-    } else {
+    } else if (!S.notifOk) {
       const seen = load('dd_seen_decisions', []);
       const fresh = (r.my_decided || []).filter(d => !seen.includes(d.id));
       fresh.forEach(d => toast(d.status === 'approved' ? `เจ้าของ (${d.decided_code}) อนุมัติยกเลิกบิล ${d.bill_no} แล้ว` : `เจ้าของไม่อนุมัติยกเลิกบิล ${d.bill_no}${d.decide_note ? ': ' + d.decide_note : ''}`, d.status === 'approved' ? 'ok' : 'warn'));
       if (fresh.length) { store('dd_seen_decisions', seen.concat(fresh.map(d => d.id)).slice(-50)); if (S.screen === 'bills') renderBills(); }
     }
   } catch (e) { if (e.message === 'SESSION_INVALID') sessionExpired(); }
+  refreshNotif();
 }
 setInterval(pollPending, 30000);
+
+// ---------------------------------------------------------------- กระดิ่งแจ้งเตือน + ผลคำขอที่ต้องกดรับทราบ
+async function refreshNotif() {
+  if (!S.session || !S.session.token || !S.online || S.screen === 'login' || DEMO) return;
+  try {
+    const r = await api('my_notifications', { p_token: S.session.token });
+    S.notif = r; S.notifOk = true; setBellBadge();
+    if (isOwner()) { S.pendingReq = r.unread || 0; updateTitle(); if (!S.pendingReq) $$('.main > .banner.warn').forEach(x => { if (x.querySelector('[data-go=requests]')) x.remove(); }); }
+    if ($('#bellList')) drawBellList();
+    showAckModal();
+  } catch (e) { if (/my_notifications|schema cache|function/i.test(e.message || '')) S.notifOk = false; }
+}
+function setBellBadge() {
+  const b = $('#bellBtn'); if (!b) return;
+  const old = b.querySelector('.badge'); if (old) old.remove();
+  const n = (S.notif && S.notif.unread) || 0;
+  if (n) b.insertAdjacentHTML('beforeend', `<i class="badge">${n}</i>`);
+  b.classList.toggle('ring', !!n);
+}
+const needAck = () => isOwner() ? [] : ((S.notif && S.notif.items) || []).filter(x => ['approved', 'rejected'].includes(x.status) && !x.ack_at);
+async function ackIds(ids) {
+  await api('ack_notifications', { p_token: S.session.token, p_ids: ids });
+  const set = ids ? new Set(ids) : null, t = new Date().toISOString();
+  (S.notif.items || []).forEach(x => { if (['approved', 'rejected'].includes(x.status) && !x.ack_at && (!set || set.has(x.id))) { x.ack_at = t; x.ack_code = me().code; } });
+  S.notif.unread = needAck().length; setBellBadge();
+}
+// เด้งค้างทีละรายการ ปิดไม่ได้จนกว่าจะกด "รับทราบ" · รอให้หน้าต่างอื่น (เช่น ใส่ PIN) ปิดก่อน
+function showAckModal() {
+  if ($('#ackModal') || $('#modal') || !S.session || S.screen === 'login') return;
+  const list = needAck(); if (!list.length) return;
+  const x = list[list.length - 1], ok = x.status === 'approved';
+  const w = document.createElement('div'); w.className = 'modal-wrap ack-wrap'; w.id = 'ackModal';
+  w.innerHTML = `<div class="modal ack" role="alertdialog" aria-modal="true">
+    <div class="ack-h ${ok ? 'ok' : 'no'}">${ok ? '✓ เจ้าของอนุมัติให้ยกเลิกบิลแล้ว' : '✕ เจ้าของไม่อนุมัติให้ยกเลิกบิล'}</div>
+    <div class="ack-b"><table>
+      <tr><td>บิล</td><td><b>${esc(x.bill_no)}</b> · ${money(x.total)} บาท</td></tr>
+      ${x.customer_name ? `<tr><td>ลูกค้า</td><td>${esc(x.customer_name)}</td></tr>` : ''}
+      <tr><td>คุณขอเมื่อ</td><td>${thTime(x.created_at)} · เหตุผล: ${esc(x.reason)}</td></tr>
+      <tr><td>ตัดสินโดย</td><td>${esc(x.decided_code || '')}${x.decided_name ? ' · ' + esc(x.decided_name) : ''} · ${thDateTime(x.decided_at)}</td></tr></table>
+      ${x.decide_note ? `<div class="ack-note"><b>หมายเหตุจากเจ้าของ:</b> ${esc(x.decide_note)}</div>` : ''}
+      ${ok ? '<p class="muted sm" style="margin-top:8px">บิลนี้ถูกยกเลิกแล้ว ของในบิลออกจากสต๊อก</p>' : '<p class="muted sm" style="margin-top:8px">บิลนี้ยังใช้งานตามปกติ</p>'}
+    </div>
+    <div class="ack-f"><button class="btn gold block" id="ackOk">รับทราบ</button>
+      <p class="muted sm center-t">${list.length > 1 ? `ยังมีอีก ${list.length - 1} รายการ · ` : ''}ระบบบันทึกเวลาที่คุณกดรับทราบ</p></div></div>`;
+  document.body.appendChild(w);
+  $('#ackOk').onclick = async (ev) => {
+    busy(ev.target, true);
+    try { await ackIds([x.id]); w.remove(); if (S.screen === 'bills') renderBills(); setTimeout(showAckModal, 300); if ($('#bellList')) drawBellList(); }
+    catch (e) { busy(ev.target, false); toast(S.online ? errText(e) : 'ต้องออนไลน์เพื่อกดรับทราบ', 'err'); }
+  };
+}
+setInterval(showAckModal, 4000);
+
+function bellPanel() {
+  modal(`<div class="bell-h"><h2>🔔 แจ้งเตือน</h2>${isOwner() ? '<button class="btn sm ghost" data-go2="requests">หน้าคำขอทั้งหมด</button>' : '<button class="btn sm ghost" id="ackAll">รับทราบทั้งหมด</button>'}</div>
+    <div id="bellList" class="bell-list"><div class="center"><span class="spin"></span></div></div>
+    <p class="muted sm center-t" style="margin-top:10px">แสดงย้อนหลัง 30 วัน</p>
+    <div class="row end"><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`, { wide: true });
+  const g = $('[data-go2]'); if (g) g.onclick = () => { closeModal(); go('requests'); };
+  const aa = $('#ackAll'); if (aa) aa.onclick = async (ev) => {
+    if (!needAck().length) return toast('ไม่มีรายการที่ต้องรับทราบ');
+    busy(ev.target, true); try { await ackIds(null); toast('รับทราบทั้งหมดแล้ว'); drawBellList(); } catch (e) { toast(errText(e), 'err'); } busy(ev.target, false);
+  };
+  if (!S.online || !S.session.token) { $('#bellList').innerHTML = '<div class="banner warn">ต้องออนไลน์เพื่อดูแจ้งเตือน</div>'; return; }
+  if (S.notif) drawBellList();
+  refreshNotif();
+}
+function drawBellList() {
+  const el = $('#bellList'); if (!el) return;
+  if (S.notifOk === false) { el.innerHTML = '<div class="banner warn">ระบบแจ้งเตือนยังไม่พร้อม — รัน schema.sql ตัวใหม่ใน Supabase</div>'; return; }
+  const items = (S.notif && S.notif.items) || [], own = isOwner();
+  if (!items.length) { el.innerHTML = '<p class="muted center-t">ยังไม่มีแจ้งเตือน</p>'; return; }
+  const when = (d) => bkkDate(d) === bkkDate() ? thTime(d) : thDateTime(d);
+  el.innerHTML = items.map((x, i) => {
+    const st = x.status, unread = own ? st === 'pending' : (['approved', 'rejected'].includes(st) && !x.ack_at);
+    const ic = { approved: ['ok', '✓'], rejected: ['no', '✕'], pending: ['wait', '⏳'], withdrawn: ['info', 'i'] }[st];
+    const who = `${esc(x.requested_code)}${x.requested_name ? '-' + esc(x.requested_name) : ''}`;
+    let title, sub, extra = '';
+    if (st === 'pending') {
+      title = own ? `${who} ขอยกเลิกบิล ${esc(x.bill_no)}` : `รออนุมัติ ยกเลิกบิล ${esc(x.bill_no)}`;
+      sub = `${money(x.total)} บาท · "${esc(x.reason)}" · ${when(x.created_at)}`;
+      extra = own ? `<div class="row" style="margin-top:8px;gap:8px"><button class="btn sm danger" data-bapp="${i}">✓ อนุมัติยกเลิก</button><button class="btn sm ghost" data-brej="${i}">✕ ไม่อนุมัติ</button></div>`
+                  : '<span class="tagx wait">รอเจ้าของตัดสิน</span>';
+    } else if (st === 'withdrawn') {
+      title = `${own ? who + ' ' : 'คุณ'}ถอนคำขอ บิล ${esc(x.bill_no)}`; sub = when(x.decided_at || x.created_at);
+    } else {
+      title = `${st === 'approved' ? 'อนุมัติ' : 'ไม่อนุมัติ'} ยกเลิกบิล ${esc(x.bill_no)}`;
+      sub = `${own ? 'ขอโดย ' + who + ' · ' : ''}ตัดสินโดย ${esc(x.decided_name || x.decided_code || '')} · ${when(x.decided_at)}${x.decide_note ? ` · "${esc(x.decide_note)}"` : ''}`;
+      extra = x.ack_at ? `<span class="tagx ack">✓ ${own ? esc(x.ack_code === 'auto' ? 'รับทราบแล้ว' : x.ack_code + ' รับทราบแล้ว') : 'รับทราบแล้ว'} ${x.ack_code === 'auto' ? '' : when(x.ack_at)}</span>`
+                       : (own ? '<span class="tagx wait">⏳ พนักงานยังไม่กดรับทราบ</span>' : '');
+    }
+    return `<div class="bell-it ${unread ? 'unread' : ''}"><span class="bdot ${ic[0]}">${ic[1]}</span><div class="bt"><b>${title}</b><div class="muted sm">${sub}</div>${extra}</div>
+      ${!own && unread ? `<button class="btn sm gold" data-back="${i}">รับทราบ</button>` : ''}</div>`;
+  }).join('');
+  $$('[data-bapp]').forEach(b => b.onclick = () => decideModal(items[+b.dataset.bapp], true, bellPanel));
+  $$('[data-brej]').forEach(b => b.onclick = () => decideModal(items[+b.dataset.brej], false, bellPanel));
+  $$('[data-back]').forEach(b => b.onclick = async () => { busy(b, true); try { await ackIds([items[+b.dataset.back].id]); drawBellList(); } catch (e) { toast(errText(e), 'err'); busy(b, false); } });
+}
 document.addEventListener('visibilitychange', () => { if (!document.hidden) pollPending(); });
 
 // ---------------------------------------------------------------- เฟส 2.1: สต๊อก + หลอม
