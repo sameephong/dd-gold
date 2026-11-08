@@ -178,7 +178,7 @@ h2{font-size:18px}
 @media print{
   @page{size:58mm auto;margin:0}
   body{background:#fff}
-  #app,#toasts,.modal-wrap{display:none!important}
+  #app,#toasts,.modal-wrap,.sigpad{display:none!important}
   #print{display:block}
 }
 
@@ -311,3 +311,25 @@ svg .bar{cursor:pointer} svg .bar:hover rect:first-child{fill:#FFFBEF}
 .ack-note{background:#FBF4E2;border-left:4px solid var(--gold);padding:10px 12px;border-radius:6px;margin-top:10px}
 .ack-f{padding:12px 22px 18px}
 @media (max-width:899px){ .who .btn.ghost{padding:0 10px} }
+
+/* ลายเซ็นลูกค้า */
+.cf-sig{margin:10px 0 12px}
+.sig-btn{border:2px dashed var(--gold);background:#FFFBEA;color:#1E1B16;font-weight:700;padding:14px}
+.sig-prev{border:1.5px solid var(--line);border-radius:12px;background:#FCFBF8;padding:10px;display:flex;flex-direction:column;align-items:center;gap:4px;margin-bottom:8px}
+.sig-prev img{max-width:100%;max-height:110px}
+.chk-row{display:flex;gap:10px;align-items:center;font-size:14px;margin:10px 0 0;cursor:pointer}
+.chk-row input{width:22px;height:22px;flex:none}
+.sigpad{position:fixed;inset:0;z-index:80;background:#fff;display:flex;flex-direction:column;touch-action:none}
+.sp-top{background:#1E1B16;color:#fff;padding:12px 18px;display:flex;align-items:center;gap:14px;font-size:15px;flex-wrap:wrap}
+.sp-top b{color:var(--gold);font-size:16px}.sp-desc{color:#ddd;font-size:14px}
+.sp-amt{margin-left:auto;font-size:22px;font-weight:700}
+.sp-paper{flex:1;position:relative;overflow:hidden;background:#fff;cursor:crosshair}
+.sp-paper canvas{position:absolute;inset:0;touch-action:none}
+.sp-hint{position:absolute;top:18px;left:0;right:0;text-align:center;color:#B9B3A6;font-size:17px;pointer-events:none;transition:opacity .2s}
+.sp-bar{display:flex;gap:10px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:#FAF8F3}
+.sp-bar .btn{padding:14px 18px;font-size:16px}
+.r-sigimg{text-align:center;margin-top:10px}
+.r-sigimg img{max-width:70%;max-height:64px;display:inline-block;margin-bottom:-16px}
+.r-bname{font-weight:700;border-bottom:1px solid #000;padding:0 10px}
+.r-sign.r-signed{margin-top:0} .r-sigimg img{max-height:15mm}
+.chk-row,label.chk-row{display:flex!important;flex-direction:row!important;align-items:center;gap:10px;text-align:left;font-size:14px;color:inherit}

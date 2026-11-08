@@ -4,7 +4,7 @@
 'use strict';
 const CFG = window.DD_CONFIG || {};
 const DEMO = !CFG.SUPABASE_URL;
-const APP_VERSION = '1.12.0';
+const APP_VERSION = '1.13.0';
 
 // ---------------------------------------------------------------- utils
 const $ = (s, el = document) => el.querySelector(s);
@@ -38,7 +38,7 @@ async function sha(text) {
 
 const ERR = {
   PIN_WRONG: 'PIN ไม่ถูกต้อง', DEVICE_INVALID: 'เครื่องนี้ยังไม่ได้ลงทะเบียน หรือถูกยกเลิกแล้ว', SESSION_INVALID: 'หมดเวลาเข้าระบบ กรุณาเข้าระบบใหม่',
-  OWNER_ONLY: 'เฉพาะเจ้าของเท่านั้น', PIN_WEAK: 'PIN ง่ายเกินไป เลือกตัวเลขอื่น', PIN_FORMAT: 'PIN ต้องเป็นตัวเลข 4 หลัก (เจ้าของ 6 หลัก)', PIN_FORMAT_6: 'PIN เจ้าของต้องเป็นตัวเลข 6 หลัก',
+  OWNER_ONLY: 'เฉพาะเจ้าของเท่านั้น', NAME_REQUIRED: 'กรอกทั้งชื่อจริงและนามสกุล', PIN_WEAK: 'PIN ง่ายเกินไป เลือกตัวเลขอื่น', PIN_FORMAT: 'PIN ต้องเป็นตัวเลข 4 หลัก (เจ้าของ 6 หลัก)', PIN_FORMAT_6: 'PIN เจ้าของต้องเป็นตัวเลข 6 หลัก',
   ALREADY_SETUP: 'ร้านนี้ตั้งค่าเจ้าของไปแล้ว', CUSTOMER_REQUIRED: 'ต้องมีเลขบัตรประชาชนผู้ขาย', WRONG_BRANCH: 'พนักงานไม่ได้อยู่สาขานี้', CANNOT_SELF: 'ปิดบัญชีตัวเองไม่ได้',
   NOT_FOUND: 'ไม่พบบิล หรือบิลถูกยกเลิกไปแล้ว', REASON_REQUIRED: 'ต้องใส่เหตุผลที่ยกเลิก', STAFF_CANCEL_OFF: 'เจ้าของปิดฟังก์ชันให้พนักงานยกเลิกบิลไว้', BILL_NOT_TODAY: 'พนักงานยกเลิกได้เฉพาะบิลของวันนี้', NEED_OWNER: 'บิลนี้เกินวงเงิน ต้องให้เจ้าของอนุมัติ', REQUEST_DONE: 'คำขอนี้ถูกตัดสินไปแล้ว', ITEMS_USED: 'ของในบิลนี้ถูกนำไปหลอม/ขายแล้ว ยกเลิกบิลไม่ได้ (ยกเลิกการหลอมก่อน)', ITEMS_CHANGED: 'รายการที่เลือกมีการเปลี่ยนแปลง กรุณาโหลดใหม่', MIXED_METAL: 'หลอมรวมได้เฉพาะโลหะชนิดเดียวกัน', OUT_HEAVIER: 'น้ำหนักหลังหลอมมากกว่าก่อนหลอม — ตรวจตัวเลขอีกครั้ง', BAD_WEIGHT: 'ใส่น้ำหนักหลังหลอม', BAD_PCT: 'ใส่ % ที่วัดได้ (0-100)', MELT_LOCKED: 'ก้อนนี้ถูกขาย/ยกเลิกไปแล้ว', SELL_NOT_ALLOWED: 'ไม่มีสิทธิ์บันทึกการขาย (เจ้าของเปิดได้ที่ ตั้งค่า → ขาย)', BUYER_REQUIRED: 'ใส่ชื่อผู้ซื้อ', NO_LINES: 'เลือกของที่ขาย', LINE_AMOUNT: 'ใส่ยอดขายให้ครบทุกรายการ', STOCK_CHANGED: 'ของบางรายการถูกขายหรือเปลี่ยนสถานะไปแล้ว กรุณาโหลดใหม่', SALE_LOCKED: 'รายการขายนี้ถูกปิดไปแล้ว', DOC_TOO_BIG: 'รูปใหญ่เกินไป', DOC_LIMIT: 'แนบได้สูงสุด 10 ไฟล์', NOTE_REQUIRED: 'พิมพ์หมายเหตุ', MERGE_NEED_2: 'เลือกอย่างน้อย 2 ก้อนเพื่อรวม', LOT_LOCKED: 'ล็อตนี้ปิดไปแล้ว', SILVER_USED: 'แร่เงินที่รับคืนถูกขายไปแล้ว ยกเลิกไม่ได้', DEMO_ONLY_SUPABASE: 'ฟังก์ชันนี้ใช้ได้เมื่อเชื่อม Supabase แล้ว', NO_VIEW: 'เจ้าของไม่ได้เปิดให้พนักงานดูข้อมูลการขาย', NET: 'ไม่มีอินเทอร์เน็ต', OFFLINE_LOGIN: 'เครื่องนี้ยังไม่เคยเข้าระบบด้วยรหัสนี้ตอนออนไลน์ จึงเข้าแบบออฟไลน์ไม่ได้'
 };
@@ -109,6 +109,10 @@ const S = {
 function saveSession(s) { S.session = s; store('dd_session', s); }
 function sessionValid() { return S.session && (Date.now() - S.session.login_at) < (CFG.SESSION_HOURS || 12) * 3600e3; }
 const me = () => S.session && S.session.staff;
+// ชื่อจริง-นามสกุล (ใช้พิมพ์ในใบรับซื้อ)
+const fullNameOf = (st) => !st ? '' : (st.full_name || [st.first_name, st.last_name].filter(Boolean).join(' ')).trim();
+const staffFull = (code) => { if (me() && code === me().code && fullNameOf(me())) return fullNameOf(me()); return fullNameOf((S.staffList || []).find(x => x.code === code)); };
+const needName = () => !DEMO && S.session && S.session.token && !fullNameOf(me()) && !staffFull(me().code);
 const isOwner = () => me() && me().role === 'owner';
 
 async function setVerifier(code, pin) { S.verifiers[code] = await sha(`dd|${S.device ? S.device.secret : ''}|${code}|${pin}`); store('dd_verifiers', S.verifiers); }
@@ -211,6 +215,7 @@ function go(screen) {
   S.screen = screen;
   window.scrollTo(0, 0);
   ({ buy: renderBuy, bills: renderBills, customers: renderCustomers, more: renderMore, settings: renderSettings, staff: renderStaff, audit: renderAudit, pin: renderPin, requests: renderRequests, stock: renderStock, sell: renderSell }[screen] || renderBuy)();
+  if (screen !== 'pin' && needName()) { setTimeout(nameModal, 100); return; }
   // เจ้าของเข้าระบบวันแรกของวัน และยังไม่ได้ตั้งราคาวันนี้ → ถามว่าจะใช้ราคาแบบไหน
   if (isOwner() && S.session.token && screen !== 'pin' && S.settings && S.settings.prices && S.settings.prices.date !== bkkDate() && S.priceAsked !== bkkDate()) {
     S.priceAsked = bkkDate(); setTimeout(dailyPriceModal, 200);
@@ -682,16 +687,20 @@ function customerSearchModal(onPick) {
 function confirmBill() {
   const people = S.staffList.filter(s => S.verifiers[s.code]);
   if (!people.some(p => p.code === me().code)) people.unshift(me());
+  const sm = signMode();
   modal(`<h2>ยืนยันบิล ${money(buyTotal())} บาท</h2>
+    ${sm !== 'off' ? `<div id="cf_sig" class="cf-sig"></div>` : ''}
     <p class="muted">ใส่ PIN ของคนที่ทำรายการนี้</p>
     <label>รหัสพนักงาน<select id="cf_code">${people.map(p => `<option value="${esc(p.code)}" ${p.code === me().code ? 'selected' : ''}>${esc(p.code)}-${esc(p.nickname)}</option>`).join('')}</select></label>
     <input id="cf_pin" type="password" inputmode="numeric" maxlength="6" class="pin-input" autofocus autocomplete="off">
     <div id="cf_drawer"></div>
     <div class="row end"><button class="btn ghost" onclick="closeModal()">กลับไปแก้</button><button class="btn gold" id="cf_ok">บันทึกและพิมพ์</button></div>`, { sticky: true });
-  showDrawerInConfirm();
+  showDrawerInConfirm(); drawSigBox();
   $('#cf_pin').onkeydown = (e) => { if (e.key === 'Enter') $('#cf_ok').click(); };
   $('#cf_ok').onclick = async (ev) => {
     const code = $('#cf_code').value, pin = $('#cf_pin').value;
+    if (sm === 'required' && !S.buy.signature) return toast('ต้องให้ลูกค้าเซ็นชื่อก่อนบันทึก', 'err');
+    if (S.buy.signature && $('#cf_consent') && !$('#cf_consent').checked) return toast('ติ๊กยืนยันว่าลูกค้าตรวจรายการแล้ว', 'err');
     busy(ev.target, true);
     let ok = await verifyLocal(code, pin);
     if (!ok && S.online) {   // ยังไม่มีข้อมูล PIN ในเครื่อง → ตรวจกับเซิร์ฟเวอร์
@@ -724,6 +733,60 @@ async function showDrawerInConfirm() {
   el.innerHTML = `<div class="banner ${after < 0 ? 'warn' : 'info'}" style="display:block">💵 เงินสดในลิ้นชัก ${money(d.balance)} − จ่ายบิลนี้ ${money(cash)} = <b class="${after < 0 ? 'bad' : ''}">${money(after)}</b> บาท
     ${after < 0 ? '<br><b>⚠️ เงินสดในลิ้นชักไม่พอ</b> — แบ่งจ่ายโอนบางส่วน หรือเติมเงินลิ้นชักก่อน' : ''}${d.guess ? '<br><span class="sm">(ออฟไลน์ — ประมาณจากเงินตั้งต้น)</span>' : ''}</div>`;
 }
+// ---------------------------------------------------------------- ลายเซ็นลูกค้า
+const signMode = () => ((S.settings && S.settings.receipt) || {}).sign_mode || 'optional';
+function drawSigBox() {
+  const el = $('#cf_sig'); if (!el) return;
+  const B = S.buy, sm = signMode();
+  el.innerHTML = B.signature
+    ? `<div class="sig-prev"><img src="${B.signature}" alt="ลายเซ็นลูกค้า"><span class="muted sm">ลายเซ็นผู้ขาย · ${thTime(B.signed_at)}</span></div>
+       <div class="row" style="gap:8px"><button class="btn ghost sm" id="sigAgain">↺ ให้เซ็นใหม่</button><button class="btn ghost sm" id="sigDel">ลบลายเซ็น</button></div>
+       <label class="chk-row"><input type="checkbox" id="cf_consent"> ลูกค้าตรวจรายการ น้ำหนัก ราคา และยืนยันขายแล้ว</label>`
+    : `<button class="btn block sig-btn" id="sigGo">✍️ ให้ลูกค้าเซ็นชื่อ${sm === 'required' ? ' <span class="pill bad">ต้องเซ็น</span>' : ''}</button>`;
+  const go_ = () => signaturePad(); 
+  if ($('#sigGo')) $('#sigGo').onclick = go_;
+  if ($('#sigAgain')) $('#sigAgain').onclick = go_;
+  if ($('#sigDel')) $('#sigDel').onclick = () => { B.signature = null; B.signed_at = null; drawSigBox(); };
+}
+// หน้ากระดาษขาวเต็มจอ ให้ลูกค้าเซ็นตรงไหนก็ได้ → ตัดเฉพาะส่วนที่มีลายเซ็น
+function signaturePad() {
+  const B = S.buy, c = B.customer || {}, M = metals();
+  const desc = B.items.map(it => `${(M[it.metal] || {}).label || it.metal} ${it.pct}% ${gram(it.weight)} ก.`).join(' · ');
+  const w = document.createElement('div'); w.className = 'sigpad'; w.id = 'sigpad';
+  w.innerHTML = `<div class="sp-top"><span>✍️ ลูกค้ายืนยันการขาย</span><b>${esc(c.name || '')}</b><span class="sp-desc">${esc(desc)}</span><span class="sp-amt">${money(buyTotal())} ฿</span></div>
+    <div class="sp-paper"><div class="sp-hint">เซ็นชื่อตรงไหนก็ได้บนหน้านี้</div><canvas id="spc"></canvas></div>
+    <div class="sp-bar"><button class="btn ghost" id="spCancel">✕ ยกเลิก</button><button class="btn ghost" id="spClear">↺ ล้าง เซ็นใหม่</button><button class="btn gold grow" id="spDone">✓ เซ็นเสร็จ</button></div>`;
+  document.body.appendChild(w);
+  const cv = $('#spc'), paper = w.querySelector('.sp-paper'), dpr = Math.max(1, window.devicePixelRatio || 1);
+  let ctx, strokes = [], cur = null, len = 0;
+  const size = () => { const r = paper.getBoundingClientRect(); cv.width = r.width * dpr; cv.height = r.height * dpr; cv.style.width = r.width + 'px'; cv.style.height = r.height + 'px'; ctx = cv.getContext('2d'); ctx.scale(dpr, dpr); redraw(); };
+  const line = (a, b, wd) => { ctx.lineWidth = wd; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); };
+  const redraw = () => { ctx.clearRect(0, 0, cv.width, cv.height); ctx.strokeStyle = '#111'; ctx.lineCap = ctx.lineJoin = 'round';
+    strokes.forEach(st => { if (st.length === 1) line(st[0], { x: st[0].x + .1, y: st[0].y }, st[0].w); for (let i = 1; i < st.length; i++) line(st[i - 1], st[i], st[i].w); }); };
+  const pt = (e) => { const r = cv.getBoundingClientRect(); const pr = e.pressure && e.pointerType === 'pen' ? e.pressure : .5; return { x: e.clientX - r.left, y: e.clientY - r.top, w: 1.8 + pr * 3.2 }; };
+  cv.onpointerdown = (e) => { e.preventDefault(); cv.setPointerCapture(e.pointerId); cur = [pt(e)]; strokes.push(cur); w.querySelector('.sp-hint').style.opacity = 0; redraw(); };
+  cv.onpointermove = (e) => { if (!cur) return; const p2 = pt(e), p1 = cur[cur.length - 1]; len += Math.hypot(p2.x - p1.x, p2.y - p1.y); cur.push(p2); line(p1, p2, p2.w); };
+  cv.onpointerup = cv.onpointercancel = () => { cur = null; };
+  const close = () => { window.removeEventListener('resize', size); w.remove(); };
+  window.addEventListener('resize', size); size();
+  $('#spClear').onclick = () => { strokes = []; len = 0; redraw(); w.querySelector('.sp-hint').style.opacity = 1; };
+  $('#spCancel').onclick = close;
+  $('#spDone').onclick = () => {
+    if (!strokes.length || len < 60) return toast('ลายเซ็นสั้นเกินไป — ให้ลูกค้าเซ็นใหม่อีกครั้ง', 'err');
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    strokes.flat().forEach(p => { x0 = Math.min(x0, p.x - p.w); y0 = Math.min(y0, p.y - p.w); x1 = Math.max(x1, p.x + p.w); y1 = Math.max(y1, p.y + p.w); });
+    const pad = 6, bw = x1 - x0 + pad * 2, bh = y1 - y0 + pad * 2;
+    const k = Math.min(1, 600 / bw, 220 / bh), out = document.createElement('canvas');
+    out.width = Math.ceil(bw * k); out.height = Math.ceil(bh * k);
+    const o = out.getContext('2d'); o.scale(k, k); o.translate(pad - x0, pad - y0); o.strokeStyle = '#000'; o.lineCap = o.lineJoin = 'round';
+    const ln = (a, b, wd) => { o.lineWidth = Math.max(wd, 2.6 / k); o.beginPath(); o.moveTo(a.x, a.y); o.lineTo(b.x, b.y); o.stroke(); };
+    strokes.forEach(st => { if (st.length === 1) ln(st[0], { x: st[0].x + .1, y: st[0].y }, st[0].w); for (let i = 1; i < st.length; i++) ln(st[i - 1], st[i], st[i].w); });
+    B.signature = out.toDataURL('image/png'); B.signed_at = now().toISOString();
+    close(); drawSigBox();
+  };
+}
+// ชื่อไฟล์ตอน "บันทึกเป็น PDF" = เลขที่ + ชื่อลูกค้า
+const fileTitle = (b) => [b.bill_no, ((b.customer || {}).name || '').replace(/[\\/:*?"<>|#%]+/g, ' ').replace(/\s+/g, ' ').trim()].filter(Boolean).join(' ');
 function nextBillNo() {
   const d = now(); const ymd = bkkDate(d).split('-'); const be = String(+ymd[0] + 543).slice(2);
   const key = 'dd_seq_' + ymd.join(''); const n = load(key, 0) + 1; store(key, n);
@@ -735,7 +798,8 @@ async function saveBill(staffCode) {
   const payload = {
     id: B.id, bill_no: nextBillNo(), staff_code: staffCode, device_id: S.device.device_id, created_at: created,
     customer: { id_card: B.customer.id_card, name: B.customer.name, name_en: B.customer.name_en || null, birth: B.customer.birth || null, gender: B.customer.gender || null, address: B.customer.address || '', phone: B.customer.phone || '', photo: B.customer.photo || null, card_issue: B.customer.card_issue || null, card_expire: B.customer.card_expire || null, source: B.customer.source || null },
-    items: B.items, total, pay_cash: cash, pay_transfer: total - cash, note: B.note || null
+    items: B.items, total, pay_cash: cash, pay_transfer: total - cash, note: B.note || null,
+    signature: B.signature || null, signed_at: B.signed_at || null, staff_name: staffFull(staffCode) || null
   };
   const rec = { id: B.id, bill_no: payload.bill_no, created_at: created, synced: false, payload };
   await idb.put('bills', rec);
@@ -763,7 +827,7 @@ function receiptHtml(b, staff, copyLabel) {
     ${b.status === 'void' ? '<div class="r-c r-b r-l">*** ยกเลิกแล้ว ***</div>' : ''}
     <div class="r-row"><span>เลขที่</span><b>${esc(b.bill_no)}</b></div>
     <div class="r-row"><span>วันที่</span><span>${esc(thDateTime(b.created_at))}</span></div>
-    <div class="r-row"><span>ผู้รับซื้อ</span><span>${esc(staff ? staff.code + '-' + staff.nickname : b.staff_code)}</span></div>
+    <div class="r-row"><span>ผู้รับซื้อ</span><span>${esc(buyerName(b, staff))}</span></div>
     <div class="r-hr"></div>
     <div class="r-b">ผู้ขาย: ${esc(c.name)}</div>
     <div class="r-s">เลขบัตร ${esc(fmtId(c.id_card))}</div>
@@ -780,16 +844,22 @@ function receiptHtml(b, staff, copyLabel) {
     ${b.note ? `<div class="r-s">หมายเหตุ: ${esc(b.note)}</div>` : ''}
     <div class="r-hr"></div>
     <div class="r-s r-j">${esc(rc.consent || '')}</div>
-    <div class="r-sign">ลงชื่อ ........................................ ผู้ขาย</div>
-    <div class="r-c r-s">(${esc(c.name)})</div>
-    <div class="r-sign">ลงชื่อ ........................................ ผู้รับซื้อ</div>
+    ${b.signature ? `<div class="r-sigimg"><img src="${b.signature}" alt=""></div>` : ''}
+    <div class="r-sign${b.signature ? ' r-signed' : ''}">ลงชื่อ ........................................ ผู้ขาย</div>
+    <div class="r-c r-s">(${esc(c.name)})${b.signature && b.signed_at ? ` · เซ็นอิเล็กทรอนิกส์ ${esc(thTime(b.signed_at))}` : ''}</div>
+    <div class="r-sign">ลงชื่อ <span class="r-bname">${esc(buyerName(b, staff))}</span> ผู้รับซื้อ</div>
     <div class="r-hr"></div>
     <div class="r-c r-s">${esc(shop.footer || '')}</div>
     <div class="r-c r-s">${esc(b.bill_no)}</div>
     <div class="r-feed"></div>
   </div>`;
 }
+function buyerName(b, staff) {
+  return b.staff_name || fullNameOf(staff) || staffFull(b.staff_code) || (staff ? staff.code + '-' + staff.nickname : b.staff_code) || '';
+}
 function printReceipt(b, staff) {
+  const t0 = document.title, t = fileTitle(b);
+  if (t) { document.title = t; const back = () => { document.title = t0; window.removeEventListener('afterprint', back); }; window.addEventListener('afterprint', back); setTimeout(back, 60000); }
   const copies = Math.max(1, Math.min(3, num((S.settings.receipt || {}).copies) || 1));
   const labels = copies === 1 ? [''] : ['ลูกค้า', 'ร้าน', 'สำเนา'].slice(0, copies);
   $('#print').innerHTML = labels.map(l => receiptHtml(b, staff, l)).join('<div class="r-break"></div>');
@@ -858,6 +928,12 @@ function billDetail(b) {
     ${can ? '<button class="btn danger" id="voidBtn">ยกเลิกบิล</button>' : ''}
     <button class="btn" id="reprint">พิมพ์ซ้ำ</button></div>`, { wide: true });
   $('#reprint').onclick = () => { printReceipt(b, staff); };
+  if (b.has_signature && !b.signature && S.online && S.session.token) {
+    api('get_bill_signature', { p_token: S.session.token, p_id: b.id }).then(r => {
+      if (!r || !r.signature) return; b.signature = r.signature; b.signed_at = r.signed_at;
+      const pv = $('.rcpt-preview'); if (pv) pv.innerHTML = receiptHtml(b, staff, '');
+    }).catch(() => {});
+  }
   const vb = $('#voidBtn'); if (vb) vb.onclick = () => voidModal(b);
   const tr = $('#toReq'); if (tr) tr.onclick = () => { closeModal(); go('requests'); };
 }
@@ -1822,7 +1898,7 @@ async function customerDetail(c) {
 function renderMore() {
   const items = [
     ['customers', 'ลูกค้า (ค้นหา / ประวัติ)', 'ทุกคน'],
-    ['pin', 'เปลี่ยน PIN / ชื่อเล่นของฉัน', 'ทุกคน'],
+    ['pin', 'บัญชีของฉัน (ชื่อจริง · PIN · ชื่อเล่น)', 'ทุกคน'],
     ...(isOwner() ? [['requests', `คำขอยกเลิกบิล${S.pendingReq ? ' 🔴 ' + S.pendingReq : ''}`, 'เจ้าของ'], ['todayprice', 'ตั้งราคาวันนี้ / เปลี่ยนราคาระหว่างวัน', 'เจ้าของ'], ['settings', 'ตั้งค่าราคา & ร้าน', 'เจ้าของ'], ['staff', 'จัดการพนักงาน', 'เจ้าของ'], ['audit', 'ประวัติการใช้งาน (ตรวจสอบ)', 'เจ้าของ']] : [])
   ];
   shell('เพิ่มเติม', `<div class="card list">${items.map(i => `<button class="list-row" data-go3="${i[0]}"><b>${i[1]}</b><span class="muted sm">${i[2]} ›</span></button>`).join('')}</div>
@@ -1833,15 +1909,41 @@ function renderMore() {
   $('#testCard').onclick = async () => { try { const r = await fetch((CFG.HELPER_URL || 'http://127.0.0.1:8765') + '/status').then(x => x.json()); toast(r.reader ? 'เจอเครื่องอ่าน: ' + r.reader : 'โปรแกรมทำงาน แต่ไม่เจอเครื่องอ่านบัตร', r.reader ? 'ok' : 'warn'); } catch (e) { toast('ไม่พบโปรแกรมเครื่องอ่านบัตรในเครื่องนี้', 'err'); } };
 }
 
+// ---------------------------------------------------------------- ชื่อจริง-นามสกุล (บังคับกรอก)
+function nameModal() {
+  if (!needName() || $('#nmFirst')) return;
+  modal(`<h2>กรอกชื่อ-นามสกุลของคุณ</h2>
+    <p class="muted sm">${esc(me().code)} · ${esc(me().nickname)} — ใช้พิมพ์ในช่อง "ผู้รับซื้อ" ของใบรับซื้อทุกใบที่คุณทำ ต้องกรอกก่อนเริ่มใช้งาน</p>
+    <div class="grid2"><label>ชื่อจริง *<input id="nmFirst" autocomplete="off" maxlength="60" autofocus></label><label>นามสกุล *<input id="nmLast" autocomplete="off" maxlength="60"></label></div>
+    <button class="btn gold block" id="nmOk">บันทึก แล้วเริ่มใช้งาน</button>
+    <p class="muted sm center-t" style="margin-top:8px">แก้ภายหลังได้ที่ เพิ่มเติม → บัญชีของฉัน</p>`, { sticky: true });
+  $('#nmLast').onkeydown = (e) => { if (e.key === 'Enter') $('#nmOk').click(); };
+  $('#nmOk').onclick = async (ev) => {
+    const f = $('#nmFirst').value.trim(), l = $('#nmLast').value.trim();
+    if (!f || !l) return toast('กรอกทั้งชื่อจริงและนามสกุล', 'err');
+    busy(ev.target, true);
+    try { await saveMyName(f, l); closeModal(); toast('บันทึกชื่อแล้ว'); }
+    catch (e) { toast(S.online ? errText(e) : 'ต้องออนไลน์เพื่อบันทึกชื่อ', 'err'); busy(ev.target, false); }
+  };
+}
+async function saveMyName(f, l) {
+  const r = await api('set_my_fullname', { p_token: S.session.token, p_first: f, p_last: l });
+  S.session.staff.first_name = r.first_name; S.session.staff.last_name = r.last_name; saveSession(S.session);
+  const x = (S.staffList || []).find(z => z.code === me().code); if (x) { x.full_name = r.first_name + ' ' + r.last_name; store('dd_staff_list', S.staffList); }
+}
+
 // ---------------------------------------------------------------- change PIN
 function renderPin() {
   const len = me().role === 'owner' ? 6 : 4;
-  shell('PIN ของฉัน', `<div class="card narrow">
+  shell('บัญชีของฉัน', `<div class="card narrow">
     ${me().must_change_pin ? '<div class="banner warn">ต้องเปลี่ยน PIN ชั่วคราวก่อนเริ่มใช้งาน — PIN ใหม่จะรู้แค่คุณคนเดียว</div>' : ''}
     <label>PIN ปัจจุบัน<input id="p0" type="password" inputmode="numeric" maxlength="${len}"></label>
     <label>PIN ใหม่ (${len} หลัก)<input id="p1" type="password" inputmode="numeric" maxlength="${len}"></label>
     <label>ใส่ PIN ใหม่อีกครั้ง<input id="p2" type="password" inputmode="numeric" maxlength="${len}"></label>
     <button class="btn block" id="pgo">เปลี่ยน PIN</button></div>
+    <div class="card narrow"><h2>ชื่อจริง-นามสกุล</h2><p class="muted sm">พิมพ์ในช่อง "ผู้รับซื้อ" ของใบรับซื้อ</p>
+      <div class="grid2"><label>ชื่อจริง *<input id="fn1" value="${esc(me().first_name || (staffFull(me().code) || '').split(' ')[0] || '')}" maxlength="60"></label><label>นามสกุล *<input id="fn2" value="${esc(me().last_name || (staffFull(me().code) || '').split(' ').slice(1).join(' ') || '')}" maxlength="60"></label></div>
+      <button class="btn ghost block" id="fngo">บันทึกชื่อจริง</button></div>
     <div class="card narrow"><label>ชื่อเล่นที่แสดงหลังรหัส<input id="nn" value="${esc(me().nickname)}" maxlength="20"></label><button class="btn ghost block" id="ngo">บันทึกชื่อเล่น</button></div>`);
   $('#pgo').onclick = async (ev) => {
     if (!S.session.token) return toast('ต้องออนไลน์เพื่อเปลี่ยน PIN', 'err');
@@ -1851,6 +1953,12 @@ function renderPin() {
     busy(ev.target, true);
     try { await api('change_pin', { p_token: S.session.token, p_old: p0, p_new: p1 }); await setVerifier(me().code, p1); S.session.staff.must_change_pin = false; saveSession(S.session); toast('เปลี่ยน PIN แล้ว'); go(isOwner() ? 'bills' : 'buy'); }
     catch (e) { toast(errText(e), 'err'); busy(ev.target, false); }
+  };
+  $('#fngo').onclick = async (ev) => {
+    const f = $('#fn1').value.trim(), l = $('#fn2').value.trim();
+    if (!f || !l) return toast('กรอกทั้งชื่อจริงและนามสกุล', 'err');
+    if (!S.session.token) return toast('ต้องออนไลน์เพื่อบันทึกชื่อ', 'err');
+    busy(ev.target, true); try { await saveMyName(f, l); toast('บันทึกชื่อแล้ว'); } catch (e) { toast(errText(e), 'err'); } busy(ev.target, false);
   };
   $('#ngo').onclick = async () => {
     const n = $('#nn').value.trim(); if (!n) return;
@@ -1966,6 +2074,9 @@ function renderSettings() {
   } else {
     body = `<div class="card"><label>จำนวนใบที่พิมพ์ต่อบิล<select id="copies">${[1, 2, 3].map(v => `<option ${num(rc.copies) === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
       <label>ข้อความยืนยันการขาย (พิมพ์ท้ายใบ ให้ลูกค้าเซ็น)<textarea id="consent" rows="6">${esc(rc.consent || '')}</textarea></label>
+      <label>ลายเซ็นลูกค้า (เซ็นบนจอก่อนพิมพ์)</label>
+      <div class="seg" id="rcSign">${[['off', 'ปิด'], ['optional', 'เซ็นหรือไม่ก็ได้'], ['required', 'บังคับเซ็นทุกบิล']].map(o => `<button data-sm="${o[0]}" class="${(rc.sign_mode || 'optional') === o[0] ? 'on' : ''}">${o[1]}</button>`).join('')}</div>
+      <p class="muted sm">ใช้ได้กับเมาส์ปากกา (เช่น VEIKK) เมาส์ หรือจอสัมผัส · ระบบตัดเฉพาะส่วนที่มีลายเซ็นไปใส่ช่อง "ผู้ขาย" ในใบ · ช่อง "ผู้รับซื้อ" ใช้ชื่อจริง-นามสกุลของคนที่ทำบิล</p>
       <button class="btn gold block" id="saveRc">บันทึก</button></div>`;
   }
   shell('ตั้งค่า', `<div class="seg">${tabs.map(t => `<button data-st="${t[0]}" class="${setTab === t[0] ? 'on' : ''}">${t[1]}</button>`).join('')}</div>${body}`);
@@ -2008,7 +2119,8 @@ function renderSettings() {
     $('#cEn').onchange = (e) => { const o = $('#cOpts'); o.style.opacity = e.target.checked ? '' : '.45'; o.style.pointerEvents = e.target.checked ? '' : 'none'; };
     $('#saveC').onclick = (ev) => save('cancel', { enabled: $('#cEn').checked, limit: Math.max(0, num($('#cLim').value)), today_only: $('#cToday').checked }, ev.target);
   } else {
-    $('#saveRc').onclick = (ev) => save('receipt', { ...rc, copies: num($('#copies').value), consent: $('#consent').value.trim() }, ev.target);
+    $$('#rcSign [data-sm]').forEach(b => b.onclick = () => { $$('#rcSign [data-sm]').forEach(x => x.classList.toggle('on', x === b)); });
+    $('#saveRc').onclick = (ev) => save('receipt', { ...rc, copies: num($('#copies').value), consent: $('#consent').value.trim(), sign_mode: ($('#rcSign .on') || {}).dataset.sm || 'optional' }, ev.target);
   }
 }
 function resizeImage(file, max) {
@@ -2025,10 +2137,24 @@ async function renderStaff() {
   $('.main').innerHTML = `<h1 class="screen-title">พนักงาน</h1>
     <div class="card"><div class="card-h"><h2>เพิ่มคนใหม่</h2></div><div class="row wrap"><input id="sn" placeholder="ชื่อเล่น" class="grow"><select id="sr"><option value="staff">พนักงาน (DD)</option><option value="owner">เจ้าของ/หุ้นส่วน (OWN)</option></select><button class="btn" id="sadd">เพิ่ม</button></div>
     <p class="muted sm">ระบบตั้งรหัสให้อัตโนมัติ และสุ่ม PIN ชั่วคราว — พนักงานต้องเปลี่ยน PIN เองตอนเข้าครั้งแรก เจ้าของจะไม่เห็น PIN จริง</p></div>
-    <div class="card list">${list.map(s => `<div class="list-row ${s.active ? '' : 'void'}"><div><b>${esc(s.code)}-${esc(s.nickname)}</b> ${s.role === 'owner' ? '<span class="pill">เจ้าของ</span>' : ''} ${s.locked ? '<span class="pill bad">ล็อก</span>' : ''} ${s.must_change_pin ? '<span class="pill warn">รอเปลี่ยน PIN</span>' : ''}<br><span class="muted sm">เข้าล่าสุด ${s.last_login ? thDateTime(s.last_login) : '—'}</span></div>
-      <div class="row">${s.code !== me().code ? `<button class="btn ghost sm" data-reset="${esc(s.code)}">รีเซ็ต PIN</button><button class="btn ghost sm" data-act="${esc(s.code)}" data-v="${!s.active}">${s.active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}</button>` : '<span class="muted sm">(คุณ)</span>'}</div></div>`).join('')}</div>`;
+    <div class="card list">${list.map(s => `<div class="list-row ${s.active ? '' : 'void'}"><div><b>${esc(s.code)}-${esc(s.nickname)}</b> ${s.role === 'owner' ? '<span class="pill">เจ้าของ</span>' : ''} ${s.locked ? '<span class="pill bad">ล็อก</span>' : ''} ${s.must_change_pin ? '<span class="pill warn">รอเปลี่ยน PIN</span>' : ''}<br>${s.first_name ? `<span class="sm">${esc(s.first_name)} ${esc(s.last_name || '')}</span>` : '<span class="pill warn">ยังไม่กรอกชื่อจริง</span>'}<br><span class="muted sm">เข้าล่าสุด ${s.last_login ? thDateTime(s.last_login) : '—'}</span></div>
+      <div class="row"><button class="btn ghost sm" data-fname="${esc(s.code)}">ชื่อจริง</button>${s.code !== me().code ? `<button class="btn ghost sm" data-reset="${esc(s.code)}">รีเซ็ต PIN</button><button class="btn ghost sm" data-act="${esc(s.code)}" data-v="${!s.active}">${s.active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}</button>` : '<span class="muted sm">(คุณ)</span>'}</div></div>`).join('')}</div>`;
   const showPin = (r, title) => modal(`<h2>${title}</h2><p>รหัส <b>${esc(r.code)}</b></p><p class="big-pin">${esc(r.temp_pin)}</p><p class="muted">PIN ชั่วคราว — บอกพนักงานครั้งเดียว ระบบจะบังคับเปลี่ยนตอนเข้าครั้งแรก</p><div class="row end"><button class="btn" onclick="closeModal()">เข้าใจแล้ว</button></div>`, { sticky: true });
   $('#sadd').onclick = async (ev) => { const n = $('#sn').value.trim(); if (!n) return toast('ใส่ชื่อเล่น', 'err'); busy(ev.target, true); try { const r = await api('add_staff', { p_token: S.session.token, p_nickname: n, p_role: $('#sr').value }); await refreshStaffList(); await renderStaff(); showPin(r, 'เพิ่มแล้ว'); } catch (e) { toast(errText(e), 'err'); busy(ev.target, false); } };
+  $$('[data-fname]').forEach(b => b.onclick = () => {
+    const st = list.find(x => x.code === b.dataset.fname);
+    modal(`<h2>ชื่อจริง-นามสกุล · ${esc(st.code)}-${esc(st.nickname)}</h2><p class="muted sm">พิมพ์ในช่อง "ผู้รับซื้อ" ของใบรับซื้อที่คนนี้ทำ</p>
+      <div class="grid2"><label>ชื่อจริง *<input id="sf1" value="${esc(st.first_name || '')}" maxlength="60" autofocus></label><label>นามสกุล *<input id="sf2" value="${esc(st.last_name || '')}" maxlength="60"></label></div>
+      <div class="row end"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button><button class="btn gold" id="sfOk">บันทึก</button></div>`);
+    $('#sfOk').onclick = async (ev) => {
+      const f = $('#sf1').value.trim(), l = $('#sf2').value.trim(); if (!f || !l) return toast('กรอกทั้งชื่อจริงและนามสกุล', 'err');
+      busy(ev.target, true);
+      try { await api('set_staff_fullname', { p_token: S.session.token, p_code: st.code, p_first: f, p_last: l });
+        if (st.code === me().code) { S.session.staff.first_name = f; S.session.staff.last_name = l; saveSession(S.session); }
+        closeModal(); toast('บันทึกแล้ว'); await refreshStaffList(); renderStaff(); }
+      catch (e) { toast(errText(e), 'err'); busy(ev.target, false); }
+    };
+  });
   $$('[data-reset]').forEach(b => b.onclick = async () => { if (!confirm('รีเซ็ต PIN ของ ' + b.dataset.reset + '?')) return; try { const r = await api('reset_pin', { p_token: S.session.token, p_code: b.dataset.reset }); delete S.verifiers[r.code]; store('dd_verifiers', S.verifiers); showPin(r, 'รีเซ็ต PIN แล้ว'); } catch (e) { toast(errText(e), 'err'); } });
   $$('[data-act]').forEach(b => b.onclick = async () => { try { await api('set_staff_active', { p_token: S.session.token, p_code: b.dataset.act, p_active: b.dataset.v === 'true' }); if (b.dataset.v !== 'true') { delete S.verifiers[b.dataset.act]; store('dd_verifiers', S.verifiers); } await refreshStaffList(); renderStaff(); } catch (e) { toast(errText(e), 'err'); } });
 }
