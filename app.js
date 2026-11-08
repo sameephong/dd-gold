@@ -4,7 +4,7 @@
 'use strict';
 const CFG = window.DD_CONFIG || {};
 const DEMO = !CFG.SUPABASE_URL;
-const APP_VERSION = '1.13.0';
+const APP_VERSION = '1.14.0';
 
 // ---------------------------------------------------------------- utils
 const $ = (s, el = document) => el.querySelector(s);
@@ -143,6 +143,7 @@ async function syncNow() {
         b.error = errText(e); await idb.put('bills', b);
       }
     }
+    await pushJobs();
   } finally { syncing = false; await updatePending(); if (S.screen === 'bills') renderBills(); }
 }
 setInterval(() => { if (S.pending) syncNow(); }, 20000);
@@ -485,15 +486,21 @@ function priceFor(metal, pct) {
 function roundAmt(v) { const r = num(S.settings.prices.round) || 1; return Math.floor(v / r) * r; }
 
 const DEST_LABEL = { lump: 'หลอมแล้ว (ก้อนย่อย)', melt: 'ยังไม่หลอม', whole: 'ขายทั้งชิ้น' };
+const JOB_DEST = { lump: '🔥 หลอมก่อนซื้อ', melt: 'ซื้อเลย (ยังไม่หลอม)', whole: 'ขายทั้งชิ้น' };
 // ---------------------------------------------------------------- BUY
 function newBuy() {
   const first = (metalEntries()[0] || ['gold'])[0];
-  return { id: uuid(), customer: null, items: [], cash: null, note: '', entry: { metal: first, kind: (metals()[first] || {}).kinds ? metals()[first].kinds[0] : '', pct: '', weight: '', price: '', amount: '', priceEdited: false, amountEdited: false, destination: 'lump', pre_weight: '' } };
+  return { id: uuid(), job_no: null, status: 'quoted', isNew: true, customer: null, items: [], cash: null, note: '', bank: '', fee: 0, entry: newEntry(first) };
+}
+function newEntry(first) {
+  first = first || (metalEntries()[0] || ['gold'])[0];
+  return { metal: first, kind: (metals()[first] || {}).kinds ? metals()[first].kinds[0] : '', pct: '', weight: '', price: '', amount: '', priceEdited: false, amountEdited: false, destination: 'lump', pre_weight: '' };
 }
 const buyTotal = () => S.buy.items.reduce((s, i) => s + num(i.amount), 0);
 
 function renderBuy() {
-  if (!S.buy) S.buy = newBuy();
+  if (!S.buy || S.buyView === 'board') return renderBoard();
+  if (S.buy.status !== 'quoted') return renderJobStage();
   const B = S.buy, c = B.customer, M = metals(), e = B.entry, total = buyTotal();
   const cash = B.cash == null ? total : Math.min(num(B.cash), total), transfer = total - cash;
   const pricesDate = S.settings.prices.date;
@@ -502,7 +509,8 @@ function renderBuy() {
   shell('รับซื้อ', `
   ${!stale && isOwner() ? `<div class="banner info"><span>ราคาวันนี้ตั้งแล้ว${assocLine()}</span> <button class="btn sm ghost" id="setTodayPrice">เปลี่ยนราคา</button></div>` : ''}
   ${stale && isOwner() ? `<div class="banner warn">ราคายังไม่ได้อัปเดตวันนี้ <button class="btn sm" id="setTodayPrice">ตั้งราคาวันนี้</button></div>` : stale ? '<div class="banner warn">ราคายังไม่ได้อัปเดตวันนี้ — แจ้งเจ้าของ</div>' : ''}
-  <div class="stepper"><button data-step="1" class="${S.buyStep === 1 ? 'on' : ''} ${c ? 'done' : ''}">1 ผู้ขาย</button><button data-step="2" class="${S.buyStep === 2 ? 'on' : ''} ${B.items.length ? 'done' : ''}">2 รายการ</button><button data-step="3" class="${S.buyStep === 3 ? 'on' : ''}">3 จ่ายเงิน</button></div>
+  ${jobHead(B)}
+  <div class="stepper"><button data-step="1" class="${S.buyStep === 1 ? 'on' : ''} ${c ? 'done' : ''}">1 ผู้ขาย</button><button data-step="2" class="${S.buyStep === 2 ? 'on' : ''} ${B.items.length ? 'done' : ''}">2 รายการ</button><button data-step="3" class="${S.buyStep === 3 ? 'on' : ''}">3 ตีราคา</button></div>
   <div class="buy-grid" data-step="${S.buyStep}">
     <section class="card" data-card="1">
       <div class="card-h"><h2>ผู้ขาย</h2><span class="muted sm">${esc(thDateLong(now()))} · <span id="clock">${thTime(now())}</span></span></div>
@@ -531,34 +539,31 @@ function renderBuy() {
       <div class="card-h"><h2>รายการ</h2><span class="muted sm">${B.items.length} รายการ</span></div>
       <div class="seg metal">${metalEntries(M).map(([k, m]) => `<button data-metal="${k}" class="${e.metal === k ? 'on' : ''}">${esc(m.label)}</button>`).join('')}</div>
       <div class="chips">${(M[e.metal] && M[e.metal].kinds || []).map(k => `<button data-kind="${esc(k)}" class="${e.kind === k ? 'on' : ''}">${esc(k)}</button>`).join('')}</div>
-      <div class="lbl">เปอร์เซ็นต์ (%)</div>
+      <div class="lbl">เปอร์เซ็นต์ (%) <span class="muted sm">${e.destination === 'lump' ? '· ก่อนหลอม' : ''}</span></div>
       <div class="chips pct">${tiers.map(t => `<button data-pct="${t.pct}" class="${num(e.pct) === t.pct ? 'on' : ''}">${t.pct}%<small>${money(t.price)}</small></button>`).join('')}
         <input id="pct" inputmode="decimal" placeholder="ใส่เอง" value="${esc(e.pct)}" class="pct-in"></div>
       <div class="grid3">
-        <label>น้ำหนัก (กรัม)<input id="weight" inputmode="decimal" value="${esc(e.weight)}" placeholder="0.00"></label>
+        <label>น้ำหนัก (กรัม)${e.destination === 'lump' ? ' ก่อนหลอม' : ''}<input id="weight" inputmode="decimal" value="${esc(e.weight)}" placeholder="0.00"></label>
         <label>ราคา/กรัม<input id="price" inputmode="decimal" value="${esc(e.price)}" placeholder="0" class="${e.priceEdited ? 'edited' : ''}"></label>
         <label>เป็นเงิน<input id="amount" inputmode="decimal" value="${esc(e.amount)}" placeholder="0" class="${e.amountEdited ? 'edited' : ''}"></label>
       </div>
-      <div class="seg dest">${['lump', 'melt', 'whole'].map(d => `<button data-dest="${d}" class="${e.destination === d ? 'on' : ''}">${DEST_LABEL[d]}</button>`).join('')}</div>
-      <div id="preWrap" style="${e.destination === 'lump' ? '' : 'display:none'}"><label>น้ำหนักก่อนหลอม (ก.) — ไม่บังคับ<input id="preW" inputmode="decimal" value="${esc(e.pre_weight || '')}" placeholder="ถ้าหลอมต่อหน้าลูกค้า ใส่น้ำหนักเดิมไว้ดูส่วนต่าง"></label></div>
+      <div class="seg dest">${['lump', 'melt', 'whole'].map(d => `<button data-dest="${d}" class="${e.destination === d ? 'on' : ''}">${JOB_DEST[d]}</button>`).join('')}</div>
       <button class="btn block" id="addItem">+ เพิ่มรายการ</button>
       <div class="items">${B.items.map((it, i) => `
-        <div class="item"><div><b>${esc(M[it.metal] ? M[it.metal].label : it.metal)} ${esc(it.pct)}%</b> · ${esc(it.kind)}<br><span class="muted sm">${gram(it.weight)} ก. × ${money(it.price_per_g)} · ${DEST_LABEL[it.destination] || ''}${it.pre_weight ? ` (ก่อนหลอม ${gram(it.pre_weight)} ก.)` : ''}</span></div>
+        <div class="item"><div><b>${esc(M[it.metal] ? M[it.metal].label : it.metal)} ${esc(it.pct)}%</b> · ${esc(it.kind)}<br><span class="muted sm">${gram(it.weight)} ก. × ${money(it.price_per_g)} · ${JOB_DEST[it.destination] || ''}</span></div>
         <div class="right"><b>${money(it.amount)}</b><button class="x" data-del="${i}" aria-label="ลบ">✕</button></div></div>`).join('') || '<p class="muted center-t sm">ยังไม่มีรายการ</p>'}</div>
       <div class="sum"><span>รวม</span><b>${money(total)} บาท</b></div>
-      <button class="btn block next-step" data-next="3" ${B.items.length ? '' : 'disabled'}>ถัดไป: จ่ายเงิน</button>
+      <button class="btn block next-step" data-next="3" ${B.items.length ? '' : 'disabled'}>ถัดไป: ตีราคา</button>
     </section>
 
     <section class="card" data-card="3">
-      <div class="card-h"><h2>จ่ายเงิน</h2></div>
-      <div class="total-box"><span>ยอดจ่ายลูกค้า</span><b>${money(total)}</b><small>บาท</small></div>
-      <div class="row"><button class="btn ghost grow" data-pay="cash">เงินสดทั้งหมด</button><button class="btn ghost grow" data-pay="transfer">โอนทั้งหมด</button></div>
-      <div class="grid2">
-        <label>เงินสด<input id="cash" inputmode="decimal" value="${cash ? cash : ''}" placeholder="0"></label>
-        <label>โอน<input id="transfer" inputmode="decimal" value="${transfer ? transfer : ''}" placeholder="0"></label>
-      </div>
+      <div class="card-h"><h2>ตีราคาเบื้องต้น</h2></div>
+      <div class="total-box"><span>ราคาเบื้องต้น</span><b>${money(total)}</b><small>บาท</small></div>
+      ${B.items.some(i => i.destination === 'lump') ? '<div class="banner info" style="display:block">ราคาเบื้องต้นยังไม่ใช่ราคาจริง — ของที่ "หลอมก่อนซื้อ" คิดราคาจริงจากน้ำหนักและ % หลังหลอม</div>' : ''}
       <label>หมายเหตุ<input id="note" value="${esc(B.note)}" placeholder="ไม่บังคับ"></label>
-      <button class="btn gold block xl" id="confirmBill" ${c && B.items.length ? '' : 'disabled'}>ยืนยันด้วย PIN และพิมพ์</button>
+      <div class="row"><button class="btn ghost grow" id="jbQuote" ${B.items.length ? '' : 'disabled'}>🖨 ใบตีราคา</button><button class="btn ghost grow danger-t" id="jbDecline" ${B.isNew && !B.items.length ? 'disabled' : ''}>✕ ลูกค้าไม่ขาย</button></div>
+      <button class="btn gold block xl" id="jbAgree" ${c && B.items.length ? '' : 'disabled'}>${B.items.some(i => i.destination === 'lump') ? '✓ ลูกค้าตกลง → ส่งหลอม' : '✓ ลูกค้าตกลง → ไปขั้นราคา'}</button>
+      <button class="btn ghost block" id="jbSave" ${c ? '' : 'disabled'}>💾 พักงานไว้ก่อน (กลับกระดาน)</button>
       ${!c ? '<p class="muted sm center-t">ยังไม่มีผู้ขาย</p>' : !B.items.length ? '<p class="muted sm center-t">ยังไม่มีรายการ</p>' : ''}
     </section>
   </div>`);
@@ -585,8 +590,7 @@ function bindBuy() {
 
   $$('[data-metal]').forEach(b => b.onclick = () => { e.metal = b.dataset.metal; e.kind = (metals()[e.metal].kinds || [''])[0]; e.pct = ''; e.priceEdited = false; e.amountEdited = false; e.price = ''; e.amount = ''; renderBuy(); });
   $$('[data-kind]').forEach(b => b.onclick = () => { e.kind = b.dataset.kind; $$('[data-kind]').forEach(x => x.classList.toggle('on', x === b)); });
-  $$('[data-dest]').forEach(b => b.onclick = () => { e.destination = b.dataset.dest; $$('[data-dest]').forEach(x => x.classList.toggle('on', x === b)); $('#preWrap').style.display = e.destination === 'lump' ? '' : 'none'; });
-  $('#preW').oninput = (ev) => { e.pre_weight = ev.target.value; };
+  $$('[data-dest]').forEach(b => b.onclick = () => { e.destination = b.dataset.dest; renderBuy(); });
   $$('[data-pct]').forEach(b => b.onclick = () => { e.pct = b.dataset.pct; $('#pct').value = e.pct; $$('[data-pct]').forEach(x => x.classList.toggle('on', x === b)); e.priceEdited = false; recalc(); $('#weight').focus(); });
   $('#pct').oninput = (ev) => { e.pct = ev.target.value; $$('[data-pct]').forEach(x => x.classList.toggle('on', num(x.dataset.pct) === num(e.pct))); e.priceEdited = false; recalc(); };
   $('#weight').oninput = (ev) => { e.weight = ev.target.value; recalc(); };
@@ -596,12 +600,18 @@ function bindBuy() {
   $('#addItem').onclick = addItem;
   $$('[data-del]').forEach(b => b.onclick = () => { B.items.splice(+b.dataset.del, 1); B.cash = null; renderBuy(); });
 
-  const total = buyTotal();
-  $$('[data-pay]').forEach(b => b.onclick = () => { B.cash = b.dataset.pay === 'cash' ? total : 0; renderBuy(); });
-  $('#cash').oninput = (ev) => { B.cash = Math.min(num(ev.target.value), total); $('#transfer').value = total - B.cash || ''; };
-  $('#transfer').oninput = (ev) => { const t = Math.min(num(ev.target.value), total); B.cash = total - t; $('#cash').value = B.cash || ''; };
   $('#note').oninput = (ev) => { B.note = ev.target.value; };
-  $('#confirmBill').onclick = confirmBill;
+  bindJobHead();
+  $('#jbQuote').onclick = () => printQuote(B);
+  $('#jbDecline').onclick = () => declineJob(B);
+  $('#jbSave').onclick = async () => { await saveJob(B, B.isNew ? 'new' : ''); S.buyView = 'board'; renderBuy(); };
+  $('#jbAgree').onclick = async () => {
+    const melt = B.items.some(i => i.destination === 'lump');
+    B.status = melt ? 'melting' : 'priced';
+    if (!melt) B.items.forEach(it => { it.final = true; });
+    await saveJob(B, melt ? 'agree_melt' : 'agree');
+    toast(melt ? `ส่งหลอม ${B.job_no} แล้ว` : 'ไปขั้นราคาและวิธีรับเงิน'); renderBuy();
+  };
 }
 function recalc() {
   const e = S.buy.entry;
@@ -613,7 +623,9 @@ function addItem() {
   if (!num(e.pct) || num(e.pct) > 100) return toast('ใส่เปอร์เซ็นต์ให้ถูกต้อง', 'err');
   if (!num(e.weight)) return toast('ใส่น้ำหนัก', 'err');
   if (!num(e.amount)) return toast('ยังไม่มีราคา — ใส่ราคา/กรัมเอง หรือให้เจ้าของตั้งราคา %', 'err');
-  S.buy.items.push({ metal: e.metal, kind: e.kind, pct: num(e.pct), weight: num(e.weight), price_per_g: num(e.price), amount: num(e.amount), destination: e.destination, pre_weight: e.destination === 'lump' && num(e.pre_weight) ? num(e.pre_weight) : null, price_edited: e.priceEdited || e.amountEdited });
+  const lump = e.destination === 'lump';
+  S.buy.items.push({ metal: e.metal, kind: e.kind, pct: num(e.pct), weight: num(e.weight), price_per_g: num(e.price), amount: num(e.amount), destination: e.destination,
+    pre_weight: lump ? num(e.weight) : null, pre_pct: lump ? num(e.pct) : null, pre_price: num(e.price), pre_amount: num(e.amount), price_edited: e.priceEdited || e.amountEdited });
   Object.assign(e, { pct: '', weight: '', price: '', amount: '', pre_weight: '', priceEdited: false, amountEdited: false });
   S.buy.cash = null; renderBuy();
 }
@@ -724,15 +736,284 @@ async function drawerBalance() {
   return { ...c, balance: c.balance - local.reduce((t, b) => t + num(b.payload.pay_cash), 0) };
 }
 async function showDrawerInConfirm() {
-  const el = $('#cf_drawer'); if (!el) return;
+  const el = $('#modal #cf_drawer') || $('#cf_drawer'); if (!el) return;
   const B = S.buy, total = buyTotal(), cash = B.cash == null ? total : Math.min(num(B.cash), total);
   if (!cash) { el.innerHTML = `<p class="muted sm">จ่ายโอนทั้งหมด ${money(total)} บาท — ไม่ใช้เงินในลิ้นชัก</p>`; return; }
   el.innerHTML = '<p class="muted sm">กำลังเช็กเงินสดในลิ้นชัก…</p>';
-  const d = await drawerBalance(); if (!$('#cf_drawer')) return;
+  const d = await drawerBalance(); if (!document.body.contains(el)) return;
   const after = d.balance - cash;
   el.innerHTML = `<div class="banner ${after < 0 ? 'warn' : 'info'}" style="display:block">💵 เงินสดในลิ้นชัก ${money(d.balance)} − จ่ายบิลนี้ ${money(cash)} = <b class="${after < 0 ? 'bad' : ''}">${money(after)}</b> บาท
     ${after < 0 ? '<br><b>⚠️ เงินสดในลิ้นชักไม่พอ</b> — แบ่งจ่ายโอนบางส่วน หรือเติมเงินลิ้นชักก่อน' : ''}${d.guess ? '<br><span class="sm">(ออฟไลน์ — ประมาณจากเงินตั้งต้น)</span>' : ''}</div>`;
 }
+// ---------------------------------------------------------------- งานรับซื้อ (ตีราคา → หลอม → วัดใหม่ → ราคา → บิล)
+const JOB_ST = { quoted: ['ตีราคาแล้ว', 'p1'], melting: ['🔥 กำลังหลอม', 'p3'], melted: ['⚖ หลอมเสร็จ รอวัด', 'p2'], priced: ['⏳ รอลูกค้าตกลง', 'p6'],
+  done: ['✓ เสร็จ (ออกบิลแล้ว)', 'p4'], declined: ['ไม่ขาย', 'p5'], returned: ['คืนก้อนทอง', 'p5'] };
+const jobPill = (st) => `<span class="jpill ${(JOB_ST[st] || ['', 'p5'])[1]}">${(JOB_ST[st] || [st])[0]}</span>`;
+const jobClosed = (st) => ['done', 'declined', 'returned'].includes(st);
+const loadLocalJobs = () => load('dd_jobs_local', {});
+function nextJobNo() {
+  const n = load('dd_job_seq', 0) + 1; store('dd_job_seq', n);
+  return `Q-${S.device.device_id}${String(n).padStart(4, '0')}`;
+}
+function jobToServer(B, logStatus) {
+  const est = B.items.reduce((t, i) => t + num(i.pre_amount != null ? i.pre_amount : i.amount), 0);
+  return { id: B.id, job_no: B.job_no, status: B.status, customer: B.customer, est_total: est, final_total: ['priced', 'done'].includes(B.status) ? buyTotalOf(B) : null,
+    fee: num(B.fee), created_at: B.created_at, updated_at: B.updated_at, log_status: logStatus || '',
+    data: { items: B.items, cash: B.cash, note: B.note, bank: B.bank, melt_note: B.melt_note || '', measured_at: B.measured_at || null } };
+}
+function jobFromServer(j) {
+  const d = j.data || {};
+  return { id: j.id, job_no: j.job_no, status: j.status, customer: j.customer, items: d.items || [], cash: d.cash == null ? null : d.cash, note: d.note || '', bank: d.bank || '',
+    melt_note: d.melt_note || '', measured_at: d.measured_at || null, fee: num(j.fee), created_at: j.created_at, updated_at: j.updated_at, bill_no: j.bill_no,
+    updated_by: j.updated_by, created_by: j.created_by, entry: newEntry() };
+}
+const buyTotalOf = (B) => B.items.reduce((s, i) => s + num(i.amount), 0);
+// บันทึกงาน: เก็บในเครื่องก่อน แล้วส่งขึ้นระบบ (ออฟไลน์ก็ทำงานต่อได้)
+async function saveJob(B, logStatus) {
+  if (!B.job_no) B.job_no = nextJobNo();
+  if (!B.created_at) B.created_at = now().toISOString();
+  B.updated_at = now().toISOString(); B.isNew = false;
+  const local = loadLocalJobs(); local[B.id] = jobToServer(B, logStatus); store('dd_jobs_local', local);
+  upsertJobList(B);
+  await pushJobs();
+}
+function upsertJobList(B) {
+  S.jobs = S.jobs || [];
+  const i = S.jobs.findIndex(x => x.id === B.id), copy = JSON.parse(JSON.stringify({ ...B, entry: undefined }));
+  if (i >= 0) S.jobs[i] = { ...S.jobs[i], ...copy }; else S.jobs.unshift(copy);
+}
+async function pushJobs() {
+  const tok = S.session && S.session.token; if (!tok || DEMO) return;
+  const local = loadLocalJobs();
+  for (const id of Object.keys(local)) {
+    try { await api('save_job', { p_token: tok, p_job: local[id] }); const l2 = loadLocalJobs(); if (l2[id] && l2[id].updated_at === local[id].updated_at) { delete l2[id]; store('dd_jobs_local', l2); } }
+    catch (e) { if (isNet(e)) break; if (/save_job|schema cache/.test(e.message || '')) { S.jobsUnavailable = true; break; } }
+  }
+}
+async function loadJobs() {
+  if (!S.online || !S.session || !S.session.token || DEMO) { mergeLocalJobs(); return; }
+  try { const l = await api('list_jobs', { p_token: S.session.token }); S.jobs = l.map(jobFromServer); S.jobsUnavailable = false; store('dd_jobs_cache', S.jobs); }
+  catch (e) { if (/list_jobs|schema cache/.test(e.message || '')) S.jobsUnavailable = true; S.jobs = S.jobs || load('dd_jobs_cache', []); }
+  mergeLocalJobs();
+}
+function mergeLocalJobs() {
+  S.jobs = S.jobs || load('dd_jobs_cache', []);
+  Object.values(loadLocalJobs()).forEach(j => { const J = jobFromServer(j); const i = S.jobs.findIndex(x => x.id === J.id); if (i < 0) S.jobs.unshift(J); else if ((S.jobs[i].updated_at || '') <= J.updated_at && !jobClosed(S.jobs[i].status)) S.jobs[i] = J; });
+}
+setInterval(() => { if (S.screen === 'buy' && S.buyView === 'board' && !$('#modal')) loadJobs().then(() => { if (S.screen === 'buy' && S.buyView === 'board' && !$('#modal')) renderBoard(true); }); }, 20000);
+
+function openJob(id) {
+  const j = (S.jobs || []).find(x => x.id === id); if (!j) return;
+  S.buy = JSON.parse(JSON.stringify(j)); S.buy.entry = newEntry(); S.buyView = 'job'; S.buyStep = S.buy.customer ? 2 : 1; renderBuy();
+}
+function newJob() { S.buy = newBuy(); S.buyView = 'job'; S.buyStep = 1; renderBuy(); }
+
+async function renderBoard(quiet) {
+  if (!quiet) { mergeLocalJobs(); }
+  const jobs = S.jobs || [], open = jobs.filter(j => !jobClosed(j.status)), closed = jobs.filter(j => jobClosed(j.status));
+  const pricesDate = S.settings.prices.date, stale = pricesDate !== bkkDate();
+  const line = (j) => {
+    const it = j.items || [], w = it.reduce((t, i) => t + num(i.pre_weight || i.weight), 0);
+    const desc = j.status === 'done' ? `บิล ${esc(j.bill_no || '')} · ${money(buyTotalOf(j))}` : j.status === 'returned' ? `คืนก้อนทอง · ค่าหลอม ${money(j.fee)}` : j.status === 'declined' ? 'ไม่ขาย · คืนของแล้ว'
+      : ['priced'].includes(j.status) ? `หลังหลอม ${it.filter(i => i.destination === 'lump').map(i => gram(i.weight) + ' ก. ' + i.pct + '%').join(', ') || '-'} · ${money(buyTotalOf(j))}`
+      : `${esc(it.map(i => i.kind).filter(Boolean).join('+') || 'รายการ')} ${gram(w)} ก. · เบื้องต้น ${money(it.reduce((t, i) => t + num(i.pre_amount != null ? i.pre_amount : i.amount), 0))}`;
+    return `<button class="jrow" data-job="${esc(j.id)}"><span class="jno">${esc(j.job_no || '')}</span><span class="jd"><b>${esc((j.customer || {}).name || 'ยังไม่มีผู้ขาย')}</b><small>${desc}</small></span>${jobPill(j.status)}${loadLocalJobs()[j.id] ? '<span class="jsync" title="ยังไม่ส่งขึ้นระบบ">⟳</span>' : ''}</button>`;
+  };
+  shell('รับซื้อ', `
+    ${stale ? `<div class="banner warn">ราคายังไม่ได้อัปเดตวันนี้ ${isOwner() ? '<button class="btn sm" id="setTodayPrice">ตั้งราคาวันนี้</button>' : '— แจ้งเจ้าของ'}</div>` : ''}
+    ${S.jobsUnavailable ? '<div class="banner warn">กระดานงานยังไม่พร้อม — รัน schema.sql ตัวใหม่ใน Supabase (ระหว่างนี้งานเก็บไว้ในเครื่องนี้)</div>' : ''}
+    <div class="card"><div class="card-h"><h2>งานรับซื้อ</h2><button class="btn gold" id="jbNew">+ งานใหม่</button></div>
+      <div class="jlist">${open.map(line).join('') || '<p class="muted center-t">ไม่มีงานค้าง · กด "+ งานใหม่" เมื่อลูกค้านำของมา</p>'}</div>
+      <p class="muted sm" style="margin-top:8px">ขั้นตอน: ${['quoted', 'melting', 'melted', 'priced', 'done'].map(jobPill).join(' → ')}</p></div>
+    ${closed.length ? `<div class="card"><div class="card-h"><h2>ปิดแล้ววันนี้</h2><span class="muted sm">${closed.length} งาน</span></div><div class="jlist">${closed.map(line).join('')}</div></div>` : ''}`);
+  const stp = $('#setTodayPrice'); if (stp) stp.onclick = dailyPriceModal;
+  $('#jbNew').onclick = newJob;
+  $$('[data-job]').forEach(b => b.onclick = () => openJob(b.dataset.job));
+  if (!quiet) loadJobs().then(() => { if (S.screen === 'buy' && S.buyView === 'board' && !$('#modal')) renderBoard(true); });
+}
+function jobHead(B) {
+  return `<div class="jhead"><button class="btn ghost sm" id="jbBack">‹ กระดานงาน</button><b>${B.job_no ? 'งาน ' + esc(B.job_no) : 'งานใหม่'}</b>${jobPill(B.status)}<span class="muted sm grow">${B.customer ? esc(B.customer.name) : ''}</span></div>`;
+}
+function bindJobHead() {
+  $('#jbBack').onclick = async () => {
+    const B = S.buy;
+    if (B.isNew && !B.customer && !B.items.length) { S.buy = null; S.buyView = 'board'; return renderBuy(); }
+    if (!jobClosed(B.status) && B.customer) await saveJob(B, B.isNew ? 'new' : '');
+    S.buyView = 'board'; renderBuy();
+  };
+}
+const lossWarn = () => num(((S.settings && S.settings.melt) || {}).loss_warn_pct ?? 2) || 2;
+const returnFee = () => { const v = ((S.settings && S.settings.melt) || {}).return_fee; return v == null || v === '' ? 100 : num(v); };
+function compareRows(B, withPrice) {
+  return B.items.filter(i => i.destination === 'lump').map((it, k) => {
+    const dw = num(it.weight) - num(it.pre_weight), dp = num(it.pct) - num(it.pre_pct), lp = num(it.pre_weight) ? -dw / num(it.pre_weight) * 100 : 0;
+    const measured = it.measured;
+    return `<tr class="sec"><td colspan="4"><b>${k + 1}. ${esc((metals()[it.metal] || {}).label || it.metal)} ${esc(it.kind || '')}</b></td></tr>
+      <tr><td>น้ำหนัก</td><td>${gram(it.pre_weight)} ก.</td><td><b>${measured ? gram(it.weight) + ' ก.' : '–'}</b></td><td class="${dw < 0 ? 'bad' : ''}">${measured ? `${dw < 0 ? '−' : '+'}${gram(Math.abs(dw))} (${lp > 0 ? '−' : '+'}${Math.abs(lp).toFixed(1)}%)` : ''}</td></tr>
+      <tr><td>% ทอง</td><td>${esc(it.pre_pct)}%</td><td><b>${measured ? esc(it.pct) + '%' : '–'}</b></td><td class="${dp < 0 ? 'bad' : ''}">${measured && dp ? (dp < 0 ? '−' : '+') + Math.abs(dp).toFixed(2).replace(/\.?0+$/, '') : ''}</td></tr>
+      ${withPrice ? `<tr><td>ราคา</td><td>${money(it.pre_amount)}</td><td><b>${money(it.amount)}</b></td><td></td></tr>` : ''}`;
+  }).join('');
+}
+function renderJobStage() {
+  const B = S.buy, M = metals(), lumps = B.items.filter(i => i.destination === 'lump'), others = B.items.filter(i => i.destination !== 'lump');
+  const cust = B.customer ? `<div class="card"><div class="row" style="justify-content:space-between"><b>${esc(B.customer.name)}</b><span class="muted sm">${esc(fmtId(B.customer.id_card))}</span></div></div>` : '';
+  let body = '';
+  if (B.status === 'melting') {
+    body = `<div class="card"><div class="card-h"><h2>🔥 กำลังหลอม</h2></div>
+      ${lumps.map(it => `<div class="item"><div><b>${esc((M[it.metal] || {}).label)} ${esc(it.kind || '')}</b><br><span class="muted sm">ก่อนหลอม ${gram(it.pre_weight)} ก. · ${esc(it.pre_pct)}% · เบื้องต้น ${money(it.pre_amount)}</span></div></div>`).join('')}
+      ${others.length ? `<p class="muted sm">ไม่ต้องหลอม: ${others.map(i => esc(i.kind) + ' ' + gram(i.weight) + ' ก.').join(', ')}</p>` : ''}
+      <button class="btn gold block xl" id="jbMelted">หลอมเสร็จแล้ว → ชั่ง/วัด % ใหม่</button>
+      <div class="row"><button class="btn ghost grow" id="jbQuote">🖨 ใบตีราคา</button><button class="btn ghost grow danger-t" id="jbDecline">✕ ลูกค้ายกเลิก (ยังไม่หลอม)</button></div></div>`;
+  } else if (B.status === 'melted') {
+    body = `<div class="card"><div class="card-h"><h2>⚖ ผลหลังหลอม</h2><span class="muted sm">ชั่ง + วัด % ก้อนที่หลอม</span></div>
+      ${lumps.map((it, k) => `<div class="measure"><b>${k + 1}. ${esc((M[it.metal] || {}).label)} ${esc(it.kind || '')}</b> <span class="muted sm">ก่อนหลอม ${gram(it.pre_weight)} ก. · ${esc(it.pre_pct)}%</span>
+        <div class="grid2"><label>น้ำหนักหลังหลอม (ก.)<input data-aw="${k}" inputmode="decimal" value="${it.measured ? esc(it.weight) : ''}" placeholder="0.00"></label>
+        <label>% หลังหลอม<input data-ap="${k}" inputmode="decimal" value="${it.measured ? esc(it.pct) : ''}" placeholder="${esc(it.pre_pct)}"></label></div></div>`).join('')}
+      <table class="cmp"><thead><tr><th></th><th>ก่อนหลอม</th><th>หลังหลอม</th><th>ต่าง</th></tr></thead><tbody id="cmpBody">${compareRows(B)}</tbody></table>
+      <div id="lossBox"></div>
+      <label>หมายเหตุสำหรับลูกค้า<input id="meltNote" value="${esc(B.melt_note || 'น้ำหนักลดจากน้ำประสานทอง/สิ่งเจือปนที่ไหม้ออกตอนหลอม')}"></label>
+      <div class="row"><button class="btn ghost grow" id="jbShow">📺 แสดงให้ลูกค้าดู</button><button class="btn ghost grow danger-t" id="jbReturn">ลูกค้าไม่ตกลง → คืนก้อนทอง</button></div>
+      <button class="btn gold block xl" id="jbMeasured">บันทึกผลหลังหลอม → คำนวณราคา ›</button></div>`;
+  } else if (B.status === 'priced') {
+    const total = buyTotalOf(B), cash = B.cash == null ? total : Math.min(num(B.cash), total), transfer = total - cash;
+    body = `<div class="card"><div class="card-h"><h2>ราคารับซื้อ</h2>${lumps.length ? '<button class="btn ghost sm" id="jbRemeasure">‹ แก้ผลหลังหลอม</button>' : ''}</div>
+      ${B.items.map((it, k) => `<div class="item"><div><b>${esc((M[it.metal] || {}).label)} ${esc(it.pct)}% · ${esc(it.kind || '')}</b>${it.destination === 'lump' ? ' <span class="pill">หลังหลอม</span>' : ''}<br>
+        <span class="muted sm">${gram(it.weight)} ก. × <input class="ppg" data-ppg="${k}" inputmode="decimal" value="${esc(it.price_per_g)}"> บาท/ก.${it.destination === 'lump' ? ` · เบื้องต้น ${money(it.pre_amount)}` : ''}</span></div><div class="right"><b>${money(it.amount)}</b></div></div>`).join('')}
+      <div class="total-box"><span>ยอดจ่ายลูกค้า</span><b>${money(total)}</b><small>บาท</small></div></div>
+    <div class="card"><div class="card-h"><h2>ลูกค้ารับเงินแบบไหน</h2></div>
+      <div class="row"><button class="btn ghost grow ${cash === total ? 'on' : ''}" data-pay="cash">เงินสดทั้งหมด</button><button class="btn ghost grow ${!cash ? 'on' : ''}" data-pay="transfer">โอนทั้งหมด</button></div>
+      <div class="grid2"><label>เงินสด<input id="cash" inputmode="decimal" value="${cash ? cash : ''}" placeholder="0"></label><label>โอน<input id="transfer" inputmode="decimal" value="${transfer ? transfer : ''}" placeholder="0"></label></div>
+      <label id="bankWrap" style="${transfer ? '' : 'display:none'}">บัญชีรับโอนของลูกค้า<input id="bank" value="${esc(B.bank || '')}" placeholder="ธนาคาร · เลขบัญชี · ชื่อบัญชี"></label>
+      <label>หมายเหตุ<input id="note" value="${esc(B.note)}" placeholder="ไม่บังคับ"></label>
+      <div id="cf_drawer"></div>
+      <div class="row">${lumps.length ? '<button class="btn ghost grow danger-t" id="jbReturn">ลูกค้าไม่ตกลง → คืนก้อนทอง</button>' : '<button class="btn ghost grow danger-t" id="jbDecline">✕ ลูกค้าไม่ขาย</button>'}</div>
+      <button class="btn gold block xl" id="jbReview">✓ ลูกค้าตกลง → ให้ลูกค้าตรวจ + เซ็น</button></div>`;
+  } else {
+    body = `<div class="card"><div class="card-h"><h2>${(JOB_ST[B.status] || [B.status])[0]}</h2></div>
+      ${B.status === 'done' ? `<p>ออกบิล <b>${esc(B.bill_no || '')}</b> แล้ว · ${money(buyTotalOf(B))} บาท — พิมพ์ซ้ำได้ที่หน้า สรุปวันนี้</p>` : ''}
+      ${B.status === 'returned' ? `<p>คืนก้อนทองให้ลูกค้าแล้ว · เก็บค่าหลอม ${money(B.fee)} บาท</p><button class="btn ghost" id="jbSlip">🖨 พิมพ์ใบคืนก้อนทองซ้ำ</button>` : ''}
+      ${B.status === 'declined' ? '<p>ลูกค้าไม่ขาย · คืนของแล้ว</p>' : ''}</div>`;
+  }
+  shell('รับซื้อ', `${jobHead(B)}<div class="job-wrap">${cust}${body}</div>`);
+  bindJobHead();
+  const on = (id, f) => { const el = $('#' + id); if (el) el.onclick = f; };
+  on('jbQuote', () => printQuote(B));
+  on('jbDecline', () => declineJob(B));
+  on('jbReturn', () => returnJob(B));
+  on('jbSlip', () => printReturnSlip(B));
+  on('jbMelted', async () => { B.status = 'melted'; await saveJob(B, 'melted'); renderBuy(); });
+  on('jbRemeasure', async () => { B.status = 'melted'; await saveJob(B, ''); renderBuy(); });
+  if (B.status === 'melted') {
+    const upd = () => {
+      lumps.forEach((it, k) => { const w = $(`[data-aw="${k}"]`).value, p = $(`[data-ap="${k}"]`).value; it.measured = num(w) > 0 && num(p) > 0; if (it.measured) { it.weight = num(w); it.pct = num(p); } });
+      $('#cmpBody').innerHTML = compareRows(B);
+      const bad = lumps.filter(it => it.measured && num(it.pre_weight) && (num(it.pre_weight) - num(it.weight)) / num(it.pre_weight) * 100 > lossWarn());
+      $('#lossBox').innerHTML = !lumps.some(i => i.measured) ? '' : bad.length ? `<div class="banner warn" style="display:block">⚠️ น้ำหนักหายเกิน ${lossWarn()}% — ตรวจชั่งซ้ำก่อนแจ้งลูกค้า</div>`
+        : `<div class="banner ok" style="display:block">✓ น้ำหนักหายไม่เกินเกณฑ์ ${lossWarn()}%</div>`;
+    };
+    $$('[data-aw],[data-ap]').forEach(i => i.oninput = upd); upd();
+    $('#meltNote').oninput = (e) => { B.melt_note = e.target.value; };
+    on('jbShow', () => { upd(); customerCompare(B); });
+    on('jbMeasured', async () => {
+      upd(); if (lumps.some(i => !i.measured)) return toast('ใส่น้ำหนักและ % หลังหลอมให้ครบทุกก้อน', 'err');
+      lumps.forEach(it => { it.price_per_g = priceFor(it.metal, it.pct) || it.pre_price; it.amount = roundAmt(num(it.weight) * num(it.price_per_g)); });
+      B.melt_note = $('#meltNote').value.trim(); B.measured_at = now().toISOString(); B.status = 'priced'; B.cash = null;
+      await saveJob(B, 'measured'); renderBuy();
+    });
+  }
+  if (B.status === 'priced') {
+    const total = () => buyTotalOf(B);
+    $$('[data-ppg]').forEach(i => i.onchange = () => { const it = B.items[+i.dataset.ppg]; it.price_per_g = num(i.value); it.amount = roundAmt(num(it.weight) * it.price_per_g); it.price_edited = true; B.cash = null; renderBuy(); });
+    $$('[data-pay]').forEach(b => b.onclick = () => { B.cash = b.dataset.pay === 'cash' ? total() : 0; renderBuy(); });
+    $('#cash').oninput = (ev) => { B.cash = Math.min(num(ev.target.value), total()); $('#transfer').value = total() - B.cash || ''; $('#bankWrap').style.display = total() - B.cash ? '' : 'none'; showDrawerInConfirm(); };
+    $('#transfer').oninput = (ev) => { const t = Math.min(num(ev.target.value), total()); B.cash = total() - t; $('#cash').value = B.cash || ''; $('#bankWrap').style.display = t ? '' : 'none'; showDrawerInConfirm(); };
+    $('#bank').oninput = (ev) => { B.bank = ev.target.value; };
+    $('#note').oninput = (ev) => { B.note = ev.target.value; };
+    showDrawerInConfirm();
+    on('jbReview', async () => {
+      if (!B.customer) return toast('ยังไม่มีผู้ขาย', 'err');
+      const t = total(), cash = B.cash == null ? t : Math.min(num(B.cash), t);
+      if (t - cash > 0 && !String(B.bank || '').trim()) return toast('ใส่บัญชีรับโอนของลูกค้า', 'err');
+      await saveJob(B, ''); reviewOverlay(B);
+    });
+  }
+}
+// จอเต็มให้ลูกค้าดูผลก่อน/หลังหลอม (ไม่มีราคา)
+function customerCompare(B) {
+  const w = document.createElement('div'); w.className = 'sigpad review';
+  w.innerHTML = `<div class="sp-top"><span>ผลการหลอม · ${esc(B.job_no || '')}</span><b>${esc((B.customer || {}).name || '')}</b></div>
+    <div class="rv-body"><table class="cmp big"><thead><tr><th></th><th>ก่อนหลอม</th><th>หลังหลอม</th><th>ต่าง</th></tr></thead><tbody>${compareRows(B)}</tbody></table>
+    ${B.melt_note ? `<div class="rv-note">${esc(B.melt_note)}</div>` : ''}</div>
+    <div class="sp-bar"><button class="btn gold grow" id="rvClose">ปิด</button></div>`;
+  document.body.appendChild(w); $('#rvClose').onclick = () => w.remove();
+}
+// จอเต็มให้ลูกค้าตรวจก่อนเซ็น
+function reviewOverlay(B) {
+  const t = buyTotalOf(B), cash = B.cash == null ? t : Math.min(num(B.cash), t), tr = t - cash, M = metals(), rc = S.settings.receipt || {};
+  const w = document.createElement('div'); w.className = 'sigpad review'; w.id = 'review';
+  w.innerHTML = `<div class="sp-top"><span>ตรวจรายละเอียดก่อนเซ็น</span><b>${esc(B.job_no || '')}</b><span class="sp-amt">${money(t)} ฿</span></div>
+    <div class="rv-body">
+      <div class="rv-row"><span>ผู้ขาย</span><b>${esc(B.customer.name)} · ${esc(fmtId(B.customer.id_card))}</b></div>
+      <div class="rv-row"><span>ผู้รับซื้อ</span><b>${esc(staffFull(me().code) || me().nickname)} · ${esc((S.settings.shop || {}).name || '')} ${esc((S.settings.shop || {}).branch || '')}</b></div>
+      <table class="cmp big"><thead><tr><th></th><th>ก่อนหลอม</th><th>หลังหลอม</th></tr></thead><tbody>
+      ${B.items.map((it, k) => `<tr class="sec"><td colspan="3"><b>${k + 1}. ${esc((M[it.metal] || {}).label)} ${esc(it.kind || '')}</b></td></tr>
+        ${it.destination === 'lump' ? `<tr><td>น้ำหนัก</td><td>${gram(it.pre_weight)} ก.</td><td><b>${gram(it.weight)} ก.</b></td></tr><tr><td>% ทอง</td><td>${esc(it.pre_pct)}%</td><td><b>${esc(it.pct)}%</b></td></tr>`
+          : `<tr><td>น้ำหนัก · %</td><td></td><td><b>${gram(it.weight)} ก. · ${esc(it.pct)}%</b></td></tr>`}
+        <tr><td>ราคา</td><td></td><td><b>${money(it.amount)}</b></td></tr>`).join('')}
+      <tr class="tot"><td>ราคารับซื้อ</td><td></td><td>${money(t)} บาท</td></tr>
+      ${cash ? `<tr><td>รับเงินสด</td><td></td><td>${money(cash)}</td></tr>` : ''}${tr ? `<tr><td>รับโอน (${esc(B.bank || '')})</td><td></td><td>${money(tr)}</td></tr>` : ''}</tbody></table>
+      ${rc.consent ? `<div class="rv-note">${esc(rc.consent)}</div>` : ''}
+    </div>
+    <div class="sp-bar"><button class="btn ghost" id="rvNo">ยังไม่ตกลง</button><button class="btn gold grow" id="rvOk">✍️ ตรวจแล้ว ${signMode() === 'off' ? 'ยืนยัน' : 'เซ็นชื่อยืนยัน'}</button></div>`;
+  document.body.appendChild(w);
+  $('#rvNo').onclick = () => w.remove();
+  $('#rvOk').onclick = () => { w.remove(); B.reviewed = true; if (signMode() === 'off') confirmBill(); else signaturePad(() => confirmBill()); };
+}
+async function declineJob(B) {
+  if (!B.customer && B.isNew) { S.buy = null; S.buyView = 'board'; return renderBuy(); }
+  if (!confirm(`ปิดงาน ${B.job_no || ''} — ลูกค้าไม่ขาย คืนของแล้ว?`)) return;
+  B.status = 'declined'; await saveJob(B, 'declined'); toast('ปิดงานแล้ว'); S.buy = null; S.buyView = 'board'; renderBuy();
+}
+function returnJob(B) {
+  modal(`<h2>คืนก้อนทองให้ลูกค้า</h2><p class="muted">${esc(B.job_no)} · ${esc((B.customer || {}).name || '')}</p>
+    <label>ค่าหลอม (บาท)<input id="rtFee" inputmode="decimal" value="${returnFee()}"></label>
+    <p class="muted sm">รับค่าหลอมเป็นเงินสด · นับเป็นเงินเข้าในสรุปวันนี้ · พิมพ์ใบคืนก้อนทองให้ลูกค้าเซ็นรับ</p>
+    <div class="row end"><button class="btn ghost" onclick="closeModal()">กลับ</button><button class="btn gold" id="rtOk">คืนก้อนทอง + พิมพ์ใบ</button></div>`);
+  $('#rtOk').onclick = async () => {
+    B.fee = num($('#rtFee').value); B.status = 'returned'; closeModal();
+    await saveJob(B, 'returned'); printReturnSlip(B); toast(`คืนก้อนทอง ${B.job_no} แล้ว`); S.buy = null; S.buyView = 'board'; renderBuy();
+  };
+}
+function slipHead(title) {
+  const shop = S.settings.shop || {};
+  return `<div class="r-c r-b r-xl">${esc(shop.name || '')}</div><div class="r-c">${esc(shop.branch || '')}</div>${shop.phone ? `<div class="r-c r-s">โทร ${esc(shop.phone)}${shop.line ? ' · LINE ' + esc(shop.line) : ''}</div>` : ''}<div class="r-hr"></div><div class="r-c r-b r-l">${title}</div>`;
+}
+function printSlip(html, title) {
+  const t0 = document.title; document.title = title; const back = () => { document.title = t0; window.removeEventListener('afterprint', back); }; window.addEventListener('afterprint', back);
+  $('#print').innerHTML = `<div class="rcpt">${html}<div class="r-feed"></div></div>`; setTimeout(() => window.print(), 150);
+}
+function printQuote(B) {
+  const M = metals(), c = B.customer || {};
+  const est = B.items.reduce((t, i) => t + num(i.pre_amount != null ? i.pre_amount : i.amount), 0);
+  printSlip(`${slipHead('ใบตีราคาเบื้องต้น')}<div class="r-c r-s">(ไม่ใช่ใบรับซื้อ)</div>
+    <div class="r-row"><span>งาน</span><b>${esc(B.job_no || '')}</b></div><div class="r-row"><span>วันที่</span><span>${esc(thDateTime(now()))}</span></div>
+    <div class="r-b">ลูกค้า: ${esc(c.name || '')}</div><div class="r-hr"></div>
+    ${B.items.map((it, i) => `<div>${i + 1}. ${esc((M[it.metal] || {}).label || it.metal)} ${esc(it.kind || '')}</div><div class="r-row r-s"><span>${gram(it.pre_weight || it.weight)} ก. · ${esc(it.pre_pct || it.pct)}%</span><b>${money(it.pre_amount != null ? it.pre_amount : it.amount)}</b></div>`).join('')}
+    <div class="r-hr"></div><div class="r-row r-b r-l"><span>ราคาเบื้องต้น</span><span>${money(est)}</span></div>
+    <div class="r-s r-j">ราคาจริงคิดจากน้ำหนักและเปอร์เซ็นต์หลังหลอม ซึ่งอาจลดลงเล็กน้อยจากน้ำประสาน/สิ่งเจือปน</div>`, `${B.job_no || 'ใบตีราคา'} ใบตีราคา ${c.name || ''}`.trim());
+}
+function printReturnSlip(B) {
+  const M = metals(), c = B.customer || {};
+  printSlip(`${slipHead('ใบคืนก้อนทอง')}
+    <div class="r-row"><span>งาน</span><b>${esc(B.job_no || '')}</b></div><div class="r-row"><span>วันที่</span><span>${esc(thDateTime(now()))}</span></div>
+    <div class="r-b">ลูกค้า: ${esc(c.name || '')}</div><div class="r-s">เลขบัตร ${esc(fmtId(c.id_card))}</div><div class="r-hr"></div>
+    ${B.items.map((it, i) => `<div>${i + 1}. ${esc((M[it.metal] || {}).label || it.metal)} ${esc(it.kind || '')}</div><div class="r-row r-s"><span>ก่อนหลอม ${gram(it.pre_weight || it.weight)} ก. · ${esc(it.pre_pct || it.pct)}%</span></div>${it.measured ? `<div class="r-row r-s"><span>หลังหลอม ${gram(it.weight)} ก. · ${esc(it.pct)}%</span></div>` : ''}`).join('')}
+    <div class="r-hr"></div><div class="r-row r-b"><span>ค่าหลอม</span><span>${money(B.fee)} บาท</span></div>
+    <div class="r-s r-j">ลูกค้าได้รับก้อนทองคืนครบถ้วนแล้ว</div>
+    <div class="r-sign">ลงชื่อ ........................................ ผู้รับคืน</div><div class="r-c r-s">(${esc(c.name || '')})</div>
+    <div class="r-sign">ลงชื่อ <span class="r-bname">${esc(staffFull(me().code) || me().nickname)}</span> ผู้คืน</div>`, `${B.job_no} คืนก้อนทอง ${c.name || ''}`.trim());
+}
+
 // ---------------------------------------------------------------- ลายเซ็นลูกค้า
 const signMode = () => ((S.settings && S.settings.receipt) || {}).sign_mode || 'optional';
 function drawSigBox() {
@@ -741,7 +1022,7 @@ function drawSigBox() {
   el.innerHTML = B.signature
     ? `<div class="sig-prev"><img src="${B.signature}" alt="ลายเซ็นลูกค้า"><span class="muted sm">ลายเซ็นผู้ขาย · ${thTime(B.signed_at)}</span></div>
        <div class="row" style="gap:8px"><button class="btn ghost sm" id="sigAgain">↺ ให้เซ็นใหม่</button><button class="btn ghost sm" id="sigDel">ลบลายเซ็น</button></div>
-       <label class="chk-row"><input type="checkbox" id="cf_consent"> ลูกค้าตรวจรายการ น้ำหนัก ราคา และยืนยันขายแล้ว</label>`
+       <label class="chk-row"><input type="checkbox" id="cf_consent" ${B.reviewed ? 'checked' : ''}> ลูกค้าตรวจรายการ น้ำหนัก ราคา และยืนยันขายแล้ว</label>`
     : `<button class="btn block sig-btn" id="sigGo">✍️ ให้ลูกค้าเซ็นชื่อ${sm === 'required' ? ' <span class="pill bad">ต้องเซ็น</span>' : ''}</button>`;
   const go_ = () => signaturePad(); 
   if ($('#sigGo')) $('#sigGo').onclick = go_;
@@ -749,7 +1030,7 @@ function drawSigBox() {
   if ($('#sigDel')) $('#sigDel').onclick = () => { B.signature = null; B.signed_at = null; drawSigBox(); };
 }
 // หน้ากระดาษขาวเต็มจอ ให้ลูกค้าเซ็นตรงไหนก็ได้ → ตัดเฉพาะส่วนที่มีลายเซ็น
-function signaturePad() {
+function signaturePad(onDone) {
   const B = S.buy, c = B.customer || {}, M = metals();
   const desc = B.items.map(it => `${(M[it.metal] || {}).label || it.metal} ${it.pct}% ${gram(it.weight)} ก.`).join(' · ');
   const w = document.createElement('div'); w.className = 'sigpad'; w.id = 'sigpad';
@@ -770,7 +1051,7 @@ function signaturePad() {
   const close = () => { window.removeEventListener('resize', size); w.remove(); };
   window.addEventListener('resize', size); size();
   $('#spClear').onclick = () => { strokes = []; len = 0; redraw(); w.querySelector('.sp-hint').style.opacity = 1; };
-  $('#spCancel').onclick = close;
+  $('#spCancel').onclick = () => { close(); if (onDone && S.buy && S.buy.reviewed) reviewOverlay(S.buy); };
   $('#spDone').onclick = () => {
     if (!strokes.length || len < 60) return toast('ลายเซ็นสั้นเกินไป — ให้ลูกค้าเซ็นใหม่อีกครั้ง', 'err');
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
@@ -782,7 +1063,7 @@ function signaturePad() {
     const ln = (a, b, wd) => { o.lineWidth = Math.max(wd, 2.6 / k); o.beginPath(); o.moveTo(a.x, a.y); o.lineTo(b.x, b.y); o.stroke(); };
     strokes.forEach(st => { if (st.length === 1) ln(st[0], { x: st[0].x + .1, y: st[0].y }, st[0].w); for (let i = 1; i < st.length; i++) ln(st[i - 1], st[i], st[i].w); });
     B.signature = out.toDataURL('image/png'); B.signed_at = now().toISOString();
-    close(); drawSigBox();
+    close(); if (onDone) onDone(); else drawSigBox();
   };
 }
 // ชื่อไฟล์ตอน "บันทึกเป็น PDF" = เลขที่ + ชื่อลูกค้า
@@ -799,7 +1080,8 @@ async function saveBill(staffCode) {
     id: B.id, bill_no: nextBillNo(), staff_code: staffCode, device_id: S.device.device_id, created_at: created,
     customer: { id_card: B.customer.id_card, name: B.customer.name, name_en: B.customer.name_en || null, birth: B.customer.birth || null, gender: B.customer.gender || null, address: B.customer.address || '', phone: B.customer.phone || '', photo: B.customer.photo || null, card_issue: B.customer.card_issue || null, card_expire: B.customer.card_expire || null, source: B.customer.source || null },
     items: B.items, total, pay_cash: cash, pay_transfer: total - cash, note: B.note || null,
-    signature: B.signature || null, signed_at: B.signed_at || null, staff_name: staffFull(staffCode) || null
+    signature: B.signature || null, signed_at: B.signed_at || null, staff_name: staffFull(staffCode) || null,
+    job_id: B.job_no ? B.id : null, job_no: B.job_no || null, pay_bank: total - cash > 0 ? (B.bank || null) : null
   };
   const rec = { id: B.id, bill_no: payload.bill_no, created_at: created, synced: false, payload };
   await idb.put('bills', rec);
@@ -807,7 +1089,8 @@ async function saveBill(staffCode) {
   closeModal();
   printReceipt(payload, staff);
   toast(`บันทึกบิล ${payload.bill_no} แล้ว`);
-  S.buy = newBuy(); S.buyStep = 1;
+  if (B.job_no) { B.status = 'done'; B.bill_no = payload.bill_no; const l = loadLocalJobs(); delete l[B.id]; store('dd_jobs_local', l); upsertJobList(B); }
+  S.buy = null; S.buyView = 'board'; S.buyStep = 1;
   await updatePending(); syncNow();
   renderBuy();
 }
@@ -826,6 +1109,7 @@ function receiptHtml(b, staff, copyLabel) {
     <div class="r-c r-b r-l">ใบรับซื้อ${copyLabel ? ` <span class="r-s">(${copyLabel})</span>` : ''}</div>
     ${b.status === 'void' ? '<div class="r-c r-b r-l">*** ยกเลิกแล้ว ***</div>' : ''}
     <div class="r-row"><span>เลขที่</span><b>${esc(b.bill_no)}</b></div>
+    ${b.job_no ? `<div class="r-row"><span>งาน</span><span>${esc(b.job_no)}</span></div>` : ''}
     <div class="r-row"><span>วันที่</span><span>${esc(thDateTime(b.created_at))}</span></div>
     <div class="r-row"><span>ผู้รับซื้อ</span><span>${esc(buyerName(b, staff))}</span></div>
     <div class="r-hr"></div>
@@ -834,13 +1118,16 @@ function receiptHtml(b, staff, copyLabel) {
     ${c.phone ? `<div class="r-s">โทร ${esc(c.phone)}</div>` : ''}
     ${c.address ? `<div class="r-s">${esc(c.address)}</div>` : ''}
     <div class="r-hr"></div>
-    ${b.items.map((it, i) => `<div class="r-it"><div>${i + 1}. ${esc(M[it.metal] ? M[it.metal].label : it.metal)} ${esc(it.pct)}% ${esc(it.kind || '')}</div>
+    ${b.items.map((it, i) => (it.pre_pct != null && it.pre_pct !== '') ? `<div class="r-it"><div class="r-b">${i + 1}. ${esc(M[it.metal] ? M[it.metal].label : it.metal)} ${esc(it.kind || '')}</div>
+      <table class="r-tbl"><tr><th></th><th>ก่อนหลอม</th><th>หลังหลอม</th></tr><tr><td>น้ำหนัก</td><td>${gram(it.pre_weight)}</td><td>${gram(it.weight)} ก.</td></tr><tr><td>% ทอง</td><td>${esc(it.pre_pct)}</td><td>${esc(it.pct)} %</td></tr></table>
+      <div class="r-row r-s"><span>${gram(it.weight)} ก. × ${money(it.price_per_g)}</span><b>${money(it.amount)}</b></div></div>`
+      : `<div class="r-it"><div>${i + 1}. ${esc(M[it.metal] ? M[it.metal].label : it.metal)} ${esc(it.pct)}% ${esc(it.kind || '')}</div>
       <div class="r-row r-s"><span>${gram(it.weight)} ก. × ${money(it.price_per_g)}</span><b>${money(it.amount)}</b></div>${it.pre_weight ? `<div class="r-s">หลอมแล้ว · ก่อนหลอม ${gram(it.pre_weight)} ก.</div>` : ''}</div>`).join('')}
     <div class="r-hr"></div>
     <div class="r-row r-b r-l"><span>รวมเงิน</span><span>${money(b.total)} บาท</span></div>
     <div class="r-row r-s"><span>น้ำหนักรวม</span><span>${gram(b.items.reduce((s, i) => s + num(i.weight), 0))} ก.</span></div>
-    ${b.pay_cash ? `<div class="r-row"><span>เงินสด</span><span>${money(b.pay_cash)}</span></div>` : ''}
-    ${b.pay_transfer ? `<div class="r-row"><span>โอน</span><span>${money(b.pay_transfer)}</span></div>` : ''}
+    ${b.pay_cash ? `<div class="r-row"><span>รับเงินสด</span><span>${money(b.pay_cash)}</span></div>` : ''}
+    ${b.pay_transfer ? `<div class="r-row"><span>รับโอน</span><span>${money(b.pay_transfer)}</span></div>${b.pay_bank ? `<div class="r-s">โอนเข้า ${esc(b.pay_bank)}</div>` : ''}` : ''}
     ${b.note ? `<div class="r-s">หมายเหตุ: ${esc(b.note)}</div>` : ''}
     <div class="r-hr"></div>
     <div class="r-s r-j">${esc(rc.consent || '')}</div>
@@ -1644,7 +1931,8 @@ async function renderBills() {
   const shopExp = shopExpSales.reduce((t, x) => t + num(x.transport_cost) + num(x.other_cost), 0);
   const outTotal = buyTotal + meltCost + transCost + shopExp;
   // ---- เงินเข้า
-  const inTotal = d.paid.reduce((t, x) => t + saleReceived(x), 0), inN = d.paid.length;
+  const fees = d.fees || [], feeTotal = fees.reduce((t, x) => t + num(x.fee), 0);
+  const inTotal = d.paid.reduce((t, x) => t + saleReceived(x), 0) + feeTotal, inN = d.paid.length + fees.length;
   const cashIn = d.paid.filter(x => x.pay_method === 'cash').reduce((t, x) => t + saleReceived(x), 0);
   // ---- รอรับเงิน
   const pend = d.pending.map(x => ({ ...x, exp: saleExpected(x) }));
@@ -1708,7 +1996,9 @@ async function renderBills() {
     ${V.sales ? `<div class="card"><div class="card-h"><h2>💰 เงินเข้า</h2><span class="muted sm">เฉพาะที่ได้รับเงินแล้ว</span></div>
       <table class="brk">
         ${d.paid.map(x => `<tr><td>${x.buyer_type === 'refinery' ? '🏭 รับเงินจากโรงสกัด' : '🏪 ขายร้านรับซื้อ'} <span class="sub">· ${esc(x.sale_no)} ${esc(x.buyer_name)}${bkkDate(x.created_at) !== S.billsDate ? ` (ขายเมื่อ ${shortTh(bkkDate(x.created_at))})` : ''}</span></td><td class="in-t">${money(saleReceived(x))}</td></tr>
-          <tr><td><span class="sub">↳ ${esc(PAY_TH[x.pay_method] || x.pay_method || '-')}</span></td><td><span class="sub">${money(saleReceived(x))}</span></td></tr>`).join('') || '<tr><td class="muted">ยังไม่มีเงินเข้า</td><td></td></tr>'}
+          <tr><td><span class="sub">↳ ${esc(PAY_TH[x.pay_method] || x.pay_method || '-')}</span></td><td><span class="sub">${money(saleReceived(x))}</span></td></tr>`).join('')}
+        ${fees.map(x => `<tr><td>🔥 ค่าหลอม (ลูกค้าไม่ขาย คืนก้อนทอง) <span class="sub">· ${esc(x.job_no)} ${esc(x.customer_name || '')}</span></td><td class="in-t">+${money(x.fee)}</td></tr>`).join('')}
+        ${!d.paid.length && !fees.length ? '<tr><td class="muted">ยังไม่มีเงินเข้า</td><td></td></tr>' : ''}
         <tr class="tot"><td>รวมเงินเข้า</td><td class="in-t">${money(inTotal)}</td></tr>
       </table></div>` : ''}
   </div>

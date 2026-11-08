@@ -333,3 +333,29 @@ svg .bar{cursor:pointer} svg .bar:hover rect:first-child{fill:#FFFBEF}
 .r-bname{font-weight:700;border-bottom:1px solid #000;padding:0 10px}
 .r-sign.r-signed{margin-top:0} .r-sigimg img{max-height:15mm}
 .chk-row,label.chk-row{display:flex!important;flex-direction:row!important;align-items:center;gap:10px;text-align:left;font-size:14px;color:inherit}
+
+/* งานรับซื้อ */
+.jhead{display:flex;align-items:center;gap:10px;margin:0 0 12px;flex-wrap:wrap}
+.jpill{display:inline-block;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;white-space:nowrap}
+.jpill.p1{background:#E8EEF8;color:#2F5597}.jpill.p2{background:#FDF0D8;color:#9A6A12}.jpill.p3{background:#EDE7F6;color:#5E3E99}
+.jpill.p4{background:#E5F1E9;color:#2F7049}.jpill.p5{background:#EEE;color:#555}.jpill.p6{background:#FBE4E1;color:#A3362B}
+.jlist{display:flex;flex-direction:column}
+.jrow{display:flex;align-items:center;gap:12px;padding:12px 6px;border:0;border-bottom:1px solid var(--line);background:none;text-align:left;cursor:pointer;width:100%;font:inherit;color:inherit}
+.jrow:hover{background:#FAF8F3}.jrow:last-child{border-bottom:0}
+.jno{font-weight:700;min-width:84px;font-size:14px}.jd{flex:1;display:flex;flex-direction:column;min-width:0}.jd small{color:var(--muted);font-size:12.5px}
+.jsync{color:#9A6A12;font-weight:700}
+.job-wrap{max-width:760px}
+.measure{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px;background:#FCFBF8}
+table.cmp{width:100%;border-collapse:collapse;margin:8px 0;font-size:14px}
+table.cmp th,table.cmp td{padding:6px 6px;border-bottom:1px solid var(--line);text-align:right}
+table.cmp th:first-child,table.cmp td:first-child{text-align:left}table.cmp th{color:var(--muted);font-weight:500;font-size:12.5px}
+table.cmp tr.sec td{background:#FAF8F3}table.cmp tr.tot td{font-weight:700;font-size:16px}
+table.cmp.big{font-size:18px}table.cmp.big tr.tot td{font-size:22px}
+.banner.ok{background:#E5F1E9;color:#2F7049}
+.danger-t{color:#C0473B!important;border-color:#E9B8B2!important}
+.btn.ghost.on{background:#1E1B16;color:#fff}
+.ppg{width:80px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;font:inherit}
+.sigpad.review .rv-body{flex:1;overflow:auto;padding:20px max(20px,calc(50% - 420px))}
+.rv-row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:16px}.rv-row span{color:var(--muted)}
+.rv-note{background:#FBF4E2;border-left:4px solid var(--gold);padding:12px 14px;border-radius:8px;margin-top:14px;line-height:1.6}
+.r-tbl{width:100%;border-collapse:collapse;font-size:9.5px;margin:1px 0}.r-tbl th,.r-tbl td{padding:0 1px;text-align:right}.r-tbl th:first-child,.r-tbl td:first-child{text-align:left}.r-tbl th{font-weight:700}
