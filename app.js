@@ -4,7 +4,7 @@
 'use strict';
 const CFG = window.DD_CONFIG || {};
 const DEMO = !CFG.SUPABASE_URL;
-const APP_VERSION = '1.16.0';
+const APP_VERSION = '1.16.1';
 
 // ---------------------------------------------------------------- utils
 const $ = (s, el = document) => el.querySelector(s);
@@ -1000,7 +1000,7 @@ function printSlip(html, title) {
 function printQuote(B) {
   const M = metals(), c = B.customer || {};
   const est = B.items.reduce((t, i) => t + num(i.pre_amount != null ? i.pre_amount : i.amount), 0);
-  printSlip(`${slipHead('ใบตีราคาเบื้องต้น')}<div class="r-c r-s">(ไม่ใช่ใบรับซื้อ)</div>
+  slipPreview('quote', B, `${slipHead('ใบตีราคาเบื้องต้น')}<div class="r-c r-s">(ไม่ใช่ใบรับซื้อ)</div>
     <div class="r-row"><span>งาน</span><b>${esc(B.job_no || '')}</b></div><div class="r-row"><span>วันที่</span><span>${esc(thDateTime(now()))}</span></div>
     <div class="r-b">ลูกค้า: ${esc(c.name || '')}</div><div class="r-hr"></div>
     ${B.items.map((it, i) => `<div>${i + 1}. ${esc((M[it.metal] || {}).label || it.metal)} ${esc(it.kind || '')}</div><div class="r-row r-s"><span>${gram(it.pre_weight || it.weight)} ก. · ${esc(it.pre_pct || it.pct)}%</span><b>${money(it.pre_amount != null ? it.pre_amount : it.amount)}</b></div>`).join('')}
@@ -1009,14 +1009,14 @@ function printQuote(B) {
 }
 function printReturnSlip(B) {
   const M = metals(), c = B.customer || {};
-  printSlip(`${slipHead('ใบคืนก้อนทอง')}
+  slipPreview('return', B, `${slipHead('ใบคืนก้อนทอง')}
     <div class="r-row"><span>งาน</span><b>${esc(B.job_no || '')}</b></div><div class="r-row"><span>วันที่</span><span>${esc(thDateTime(now()))}</span></div>
     <div class="r-b">ลูกค้า: ${esc(c.name || '')}</div><div class="r-s">เลขบัตร ${esc(fmtId(c.id_card))}</div><div class="r-hr"></div>
     ${B.items.map((it, i) => `<div>${i + 1}. ${esc((M[it.metal] || {}).label || it.metal)} ${esc(it.kind || '')}</div><div class="r-row r-s"><span>ก่อนหลอม ${gram(it.pre_weight || it.weight)} ก. · ${esc(it.pre_pct || it.pct)}%</span></div>${it.measured ? `<div class="r-row r-s"><span>หลังหลอม ${gram(it.weight)} ก. · ${esc(it.pct)}%</span></div>` : ''}`).join('')}
     <div class="r-hr"></div><div class="r-row r-b"><span>ค่าหลอม</span><span>${money(B.fee)} บาท</span></div>
     <div class="r-s r-j">ลูกค้าได้รับก้อนทองคืนครบถ้วนแล้ว</div>
-    <div class="r-sign">ลงชื่อ ........................................ ผู้รับคืน</div><div class="r-c r-s">(${esc(c.name || '')})</div>
-    <div class="r-sign">ลงชื่อ <span class="r-bname">${esc(staffFull(me().code) || me().nickname)}</span> ผู้คืน</div>`, `${B.job_no} คืนก้อนทอง ${c.name || ''}`.trim());
+    <div class="r-sign"><span>ลงชื่อ</span><i></i><span>ผู้รับคืน</span></div><div class="r-c r-s">(${esc(c.name || '')})</div>
+    <div class="r-sign"><span>ลงชื่อ</span><i><b class="r-bname">${esc(staffFull(me().code) || me().nickname)}</b></i><span>ผู้คืน</span></div>`, `${B.job_no} คืนก้อนทอง ${c.name || ''}`.trim());
 }
 
 // ---------------------------------------------------------------- ลายเซ็นลูกค้า
@@ -1253,6 +1253,9 @@ async function receiptCanvas(b, staff, copyLabel) {
   T('(' + (c.name || '') + ')', { s: 18, c: 1, wrap: 1 }); if (b.signature && b.signed_at) T('เซ็นอิเล็กทรอนิกส์ ' + thTime(b.signed_at), { s: 18, c: 1 });
   SP(16); ops.push({ k: 'sign', a: 'ลงชื่อ', r: 'ผู้รับซื้อ', mid: buyerName(b, staff) });
   HR(); T(shop.footer, { s: 20, c: 1, wrap: 1 }); T(b.bill_no, { s: 18, c: 1 }); SP(10);
+  return opsCanvas(ops);
+}
+function opsCanvas(ops) {
   const cv = document.createElement('canvas'); cv.width = RW; cv.height = 4000; const g = cv.getContext('2d');
   const run = (dry) => {
     let y = 12; g.fillStyle = '#000'; g.textBaseline = 'top';
@@ -1277,6 +1280,51 @@ async function receiptCanvas(b, staff, copyLabel) {
   };
   const h = run(true); cv.height = h; g.fillStyle = '#fff'; g.fillRect(0, 0, RW, h); run(false);
   return cv;
+}
+// ใบตีราคา / ใบคืนก้อนทอง — ใช้ตัววาดเดียวกับใบรับซื้อ
+async function slipOps(kind, B) {
+  const shop = S.settings.shop || {}, M = metals(), c = B.customer || {};
+  const logo = await imgLoad(shop.logo), lg = logo && monoLogo(logo);
+  const ops = [], T = (t, o = {}) => t != null && t !== '' && ops.push({ k: 't', t: String(t), ...o }), LR = (a, r, o = {}) => ops.push({ k: 'lr', a: String(a), r: String(r), ...o }), HR = () => ops.push({ k: 'hr' }), SP = (h) => ops.push({ k: 'sp', h });
+  if (lg) ops.push({ k: 'img', im: lg, w: 180, maxh: 100 });
+  T(shop.name, { s: 30, b: 1, c: 1 }); T(shop.branch, { s: 20, c: 1 }); if (shop.phone) T('โทร ' + shop.phone + (shop.line ? ' · LINE ' + shop.line : ''), { s: 18, c: 1 });
+  HR();
+  if (kind === 'quote') {
+    T('ใบตีราคาเบื้องต้น', { s: 28, b: 1, c: 1 }); T('(ไม่ใช่ใบรับซื้อ)', { s: 18, c: 1 });
+    LR('งาน', B.job_no || '', { b: 1 }); LR('วันที่', thDateTime(now())); T('ลูกค้า: ' + (c.name || ''), { b: 1, wrap: 1 }); HR();
+    let est = 0;
+    B.items.forEach((it, i) => { const amt = num(it.pre_amount != null ? it.pre_amount : it.amount); est += amt;
+      T((i + 1) + '. ' + ((M[it.metal] || {}).label || it.metal) + ' ' + (it.kind || ''), { b: 1, wrap: 1 });
+      LR(gram(it.pre_weight || it.weight) + ' ก. · ' + (it.pre_pct || it.pct) + '%', money(amt)); });
+    HR(); LR('ราคาเบื้องต้น', money(est) + ' บาท', { s: 28, b: 1 });
+    T('ราคาจริงคิดจากน้ำหนักและเปอร์เซ็นต์หลังหลอม ซึ่งอาจลดลงเล็กน้อยจากน้ำประสาน/สิ่งเจือปน', { s: 18, wrap: 1 });
+  } else {
+    T('ใบคืนก้อนทอง', { s: 28, b: 1, c: 1 });
+    LR('งาน', B.job_no || '', { b: 1 }); LR('วันที่', thDateTime(now())); T('ลูกค้า: ' + (c.name || ''), { b: 1, wrap: 1 }); T('เลขบัตร ' + fmtId(c.id_card), { s: 20 }); HR();
+    B.items.forEach((it, i) => { T((i + 1) + '. ' + ((M[it.metal] || {}).label || it.metal) + ' ' + (it.kind || ''), { b: 1, wrap: 1 });
+      LR('ก่อนหลอม', gram(it.pre_weight || it.weight) + ' ก. · ' + (it.pre_pct || it.pct) + '%', { s: 20 });
+      if (it.measured) LR('หลังหลอม', gram(it.weight) + ' ก. · ' + it.pct + '%', { s: 20 }); });
+    HR(); LR('ค่าหลอม', money(B.fee) + ' บาท', { b: 1 }); T('ลูกค้าได้รับก้อนทองคืนครบถ้วนแล้ว', { s: 18, wrap: 1 });
+    SP(34); ops.push({ k: 'sign', a: 'ลงชื่อ', r: 'ผู้รับคืน' }); T('(' + (c.name || '') + ')', { s: 18, c: 1 });
+    SP(16); ops.push({ k: 'sign', a: 'ลงชื่อ', r: 'ผู้คืน', mid: staffFull(me().code) || me().nickname });
+  }
+  HR(); T(shop.footer, { s: 20, c: 1, wrap: 1 }); SP(10);
+  return ops;
+}
+async function btPrintOps(getOps) {
+  if (BT.busy) return toast('เครื่องพิมพ์กำลังพิมพ์อยู่ — รอสักครู่', 'warn');
+  if (!(await btReady())) { try { await btPick(); } catch (e) { if (e.name !== 'NotFoundError') toast('เชื่อมไม่สำเร็จ: ' + e.message, 'err'); return false; } }
+  BT.busy = true;
+  try { toast('กำลังพิมพ์…'); await btSend(escposRaster(opsCanvas(await getOps()))); return true; }
+  catch (e) { BT.ch = null; toast('พิมพ์ผ่านบลูทูธไม่สำเร็จ: ' + e.message, 'err'); return false; }
+  finally { BT.busy = false; }
+}
+// ดูใบตัวใหญ่บนจอ แล้วค่อยเลือกพิมพ์
+async function slipPreview(kind, B, html, title) {
+  modal(`<div class="rcpt-preview big"><div class="rcpt">${html}</div></div>
+    <div class="row end"><button class="btn ghost" onclick="closeModal()">ปิด</button><button class="btn ghost" id="slipPdf">PDF / หน้าต่าง Chrome</button>${navigator.bluetooth ? '<button class="btn gold" id="slipBt">🖨️ พิมพ์บลูทูธ</button>' : ''}</div>`, { wide: true });
+  $('#slipPdf').onclick = () => { closeModal(); printSlip(html, title); };
+  if ($('#slipBt')) $('#slipBt').onclick = async (ev) => { busy(ev.target, true); const ok = await btPrintOps(() => slipOps(kind, B)); busy(ev.target, false); if (ok) closeModal(); };
 }
 function escposRaster(cv) {
   const w = cv.width, h = cv.height, d = cv.getContext('2d').getImageData(0, 0, w, h).data, bw = w / 8, out = [new Uint8Array([0x1B, 0x40])];
