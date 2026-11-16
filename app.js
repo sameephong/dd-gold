@@ -4,7 +4,7 @@
 'use strict';
 const CFG = window.DD_CONFIG || {};
 const DEMO = !CFG.SUPABASE_URL;
-const APP_VERSION = '1.15.1';
+const APP_VERSION = '1.15.2';
 
 // ---------------------------------------------------------------- utils
 const $ = (s, el = document) => el.querySelector(s);
@@ -1197,11 +1197,26 @@ async function btReady() {
 }
 const imgLoad = (src) => new Promise((ok) => { if (!src) return ok(null); const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src; });
 const segWords = (t) => ('Segmenter' in Intl) ? [...new Intl.Segmenter('th', { granularity: 'word' }).segment(t)].map(x => x.segment) : String(t).split(/(\s+)/);
+// โลโก้ → ขาวดำ: พื้นเข้ม (เช่นไอคอนพื้นเขียว) จะกลับสีให้อัตโนมัติ แล้วตัดขอบว่างออก
+function monoLogo(im) {
+  const W0 = Math.min(600, im.naturalWidth), H0 = Math.round(W0 * im.naturalHeight / im.naturalWidth);
+  const c = document.createElement('canvas'); c.width = W0; c.height = H0; const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(im, 0, 0, W0, H0);
+  const id = g.getImageData(0, 0, W0, H0), d = id.data, L = new Float32Array(W0 * H0);
+  for (let i = 0; i < W0 * H0; i++) { const a = d[i * 4 + 3] / 255; L[i] = a * (d[i * 4] * .3 + d[i * 4 + 1] * .59 + d[i * 4 + 2] * .11) + (1 - a) * 255; }
+  let edge = 0, n = 0; for (let x = 0; x < W0; x++) { edge += L[x] + L[(H0 - 1) * W0 + x]; n += 2; } for (let y = 0; y < H0; y++) { edge += L[y * W0] + L[y * W0 + W0 - 1]; n += 2; }
+  const inv = edge / n < 128; let x0 = W0, y0 = H0, x1 = -1, y1 = -1;
+  for (let y = 0; y < H0; y++) for (let x = 0; x < W0; x++) { const i = y * W0 + x, a = d[i * 4 + 3]; let v = inv ? (a < 40 ? 255 : 255 - L[i]) : L[i]; const blk = v < 128; d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = blk ? 0 : 255; d[i * 4 + 3] = 255;
+    if (blk) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } }
+  if (x1 < 0) return null;
+  g.putImageData(id, 0, 0); const p = 4, cw = x1 - x0 + 1 + p * 2, ch = y1 - y0 + 1 + p * 2, o = document.createElement('canvas'); o.width = cw; o.height = ch;
+  const og = o.getContext('2d'); og.fillStyle = '#fff'; og.fillRect(0, 0, cw, ch); og.drawImage(c, x0 - p, y0 - p, cw, ch, 0, 0, cw, ch);
+  o.naturalWidth = cw; o.naturalHeight = ch; return o;
+}
 async function receiptCanvas(b, staff, copyLabel) {
   const shop = S.settings.shop || {}, rc = S.settings.receipt || {}, M = metals(), c = b.customer || {};
   const [logo, sig] = await Promise.all([imgLoad(shop.logo), imgLoad(b.signature)]);
   const ops = [], T = (t, o = {}) => t != null && t !== '' && ops.push({ k: 't', t: String(t), ...o }), LR = (a, r, o = {}) => ops.push({ k: 'lr', a: String(a), r: String(r), ...o }), HR = () => ops.push({ k: 'hr' }), SP = (h) => ops.push({ k: 'sp', h });
-  if (logo) ops.push({ k: 'img', im: logo, w: 200, mono: 1 });
+  const lg = logo && monoLogo(logo); if (lg) ops.push({ k: 'img', im: lg, w: 210, maxh: 120 });
   T(shop.name, { s: 30, b: 1, c: 1 }); T(shop.name2, { s: 20, c: 1 }); T(shop.branch, { s: 20, c: 1 });
   T(shop.address, { s: 18, c: 1, wrap: 1 }); if (shop.phone) T('โทร ' + shop.phone + (shop.line ? ' · LINE ' + shop.line : ''), { s: 18, c: 1 });
   HR(); T('ใบรับซื้อ' + (copyLabel ? ' (' + copyLabel + ')' : ''), { s: 28, b: 1, c: 1 });
@@ -1228,7 +1243,7 @@ async function receiptCanvas(b, staff, copyLabel) {
   if (b.pay_transfer) { LR('รับโอน', money(b.pay_transfer)); T(b.pay_bank ? 'โอนเข้า ' + b.pay_bank : '', { s: 18, wrap: 1 }); }
   if (b.note) T('หมายเหตุ: ' + b.note, { s: 18, wrap: 1 });
   HR(); T(rc.consent, { s: 18, wrap: 1 });
-  if (sig) { SP(6); ops.push({ k: 'img', im: sig, w: 240, maxh: 110 }); } else SP(34);
+  if (sig) { SP(10); ops.push({ k: 'img', im: sig, w: 230, maxh: 90 }); SP(-26); } else SP(34);
   ops.push({ k: 'sign', a: 'ลงชื่อ', r: 'ผู้ขาย' });
   T('(' + (c.name || '') + ')', { s: 18, c: 1, wrap: 1 }); if (b.signature && b.signed_at) T('เซ็นอิเล็กทรอนิกส์ ' + thTime(b.signed_at), { s: 18, c: 1 });
   SP(16); ops.push({ k: 'sign', a: 'ลงชื่อ', r: 'ผู้รับซื้อ', mid: buyerName(b, staff) });
@@ -1240,8 +1255,7 @@ async function receiptCanvas(b, staff, copyLabel) {
       if (o.k === 'sp') { y += o.h; continue; }
       if (o.k === 'hr') { y += 6; if (!dry) for (let x = 0; x < RW; x += 8) g.fillRect(x, y, 5, 2); y += 10; continue; }
       if (o.k === 'img') { let w = Math.min(o.w, o.im.naturalWidth), h = w * o.im.naturalHeight / o.im.naturalWidth; if (o.maxh && h > o.maxh) { w = w * o.maxh / h; h = o.maxh; }
-        if (!dry) { const t = document.createElement('canvas'); t.width = w; t.height = h; const tg = t.getContext('2d'); if (!o.mono) { tg.fillStyle = '#fff'; tg.fillRect(0, 0, w, h); } tg.drawImage(o.im, 0, 0, w, h);
-          if (o.mono) { tg.globalCompositeOperation = 'source-in'; tg.fillStyle = '#000'; tg.fillRect(0, 0, w, h); } g.drawImage(t, (RW - w) / 2, y); }
+        if (!dry) { const t = document.createElement('canvas'); t.width = w; t.height = h; const tg = t.getContext('2d'); tg.fillStyle = '#fff'; tg.fillRect(0, 0, w, h); tg.drawImage(o.im, 0, 0, w, h); g.drawImage(t, (RW - w) / 2, y); }
         y += h + 4; continue; }
       const sz = (o.s || 22) + 2, lh = sz * 1.42; g.font = (o.b ? '700 ' : '400 ') + sz + 'px ' + RF;
       if (o.k === 'lr') { if (!dry) { g.textAlign = 'left'; g.fillText(o.a, 4, y); g.textAlign = 'right'; g.fillText(o.r, RW - 4, y); g.textAlign = 'left'; } y += lh; continue; }
