@@ -4,7 +4,7 @@
 'use strict';
 const CFG = window.DD_CONFIG || {};
 const DEMO = !CFG.SUPABASE_URL;
-const APP_VERSION = '1.14.0';
+const APP_VERSION = '1.15.1';
 
 // ---------------------------------------------------------------- utils
 const $ = (s, el = document) => el.querySelector(s);
@@ -1039,15 +1039,32 @@ function signaturePad(onDone) {
     <div class="sp-bar"><button class="btn ghost" id="spCancel">✕ ยกเลิก</button><button class="btn ghost" id="spClear">↺ ล้าง เซ็นใหม่</button><button class="btn gold grow" id="spDone">✓ เซ็นเสร็จ</button></div>`;
   document.body.appendChild(w);
   const cv = $('#spc'), paper = w.querySelector('.sp-paper'), dpr = Math.max(1, window.devicePixelRatio || 1);
-  let ctx, strokes = [], cur = null, len = 0;
+  let ctx, strokes = [], cur = null, len = 0, lastRaw = null;
   const size = () => { const r = paper.getBoundingClientRect(); cv.width = r.width * dpr; cv.height = r.height * dpr; cv.style.width = r.width + 'px'; cv.style.height = r.height + 'px'; ctx = cv.getContext('2d'); ctx.scale(dpr, dpr); redraw(); };
-  const line = (a, b, wd) => { ctx.lineWidth = wd; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); };
-  const redraw = () => { ctx.clearRect(0, 0, cv.width, cv.height); ctx.strokeStyle = '#111'; ctx.lineCap = ctx.lineJoin = 'round';
-    strokes.forEach(st => { if (st.length === 1) line(st[0], { x: st[0].x + .1, y: st[0].y }, st[0].w); for (let i = 1; i < st.length; i++) line(st[i - 1], st[i], st[i].w); }); };
+  // วาดเส้นแบบโค้งนุ่ม (ผ่านจุดกึ่งกลาง) แทนเส้นตรงหักมุม
+  const seg = (g, st, i, minW) => { const p0 = st[i - 2] || st[i - 1], p1 = st[i - 1], p2 = st[i];
+    const m1 = { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 }, m2 = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+    g.lineWidth = Math.max(minW || 0, (p1.w + p2.w) / 2); g.beginPath(); g.moveTo(i < 2 ? p1.x : m1.x, i < 2 ? p1.y : m1.y); g.quadraticCurveTo(p1.x, p1.y, m2.x, m2.y); g.stroke(); };
+  const tail = (g, st, minW) => { const n = st.length; if (n < 2) return; const a = st[n - 2], b = st[n - 1];
+    g.lineWidth = Math.max(minW || 0, b.w); g.beginPath(); g.moveTo((a.x + b.x) / 2, (a.y + b.y) / 2); g.lineTo(b.x, b.y); g.stroke(); };
+  const drawStroke = (g, st, minW) => { if (st.length === 1) { g.lineWidth = Math.max(minW || 0, st[0].w); g.beginPath(); g.moveTo(st[0].x, st[0].y); g.lineTo(st[0].x + .1, st[0].y); g.stroke(); return; }
+    for (let i = 1; i < st.length; i++) seg(g, st, i, minW); tail(g, st, minW); };
+  const redraw = () => { ctx.clearRect(0, 0, cv.width, cv.height); ctx.strokeStyle = '#111'; ctx.lineCap = ctx.lineJoin = 'round'; strokes.forEach(st => drawStroke(ctx, st)); };
   const pt = (e) => { const r = cv.getBoundingClientRect(); const pr = e.pressure && e.pointerType === 'pen' ? e.pressure : .5; return { x: e.clientX - r.left, y: e.clientY - r.top, w: 1.8 + pr * 3.2 }; };
-  cv.onpointerdown = (e) => { e.preventDefault(); cv.setPointerCapture(e.pointerId); cur = [pt(e)]; strokes.push(cur); w.querySelector('.sp-hint').style.opacity = 0; redraw(); };
-  cv.onpointermove = (e) => { if (!cur) return; const p2 = pt(e), p1 = cur[cur.length - 1]; len += Math.hypot(p2.x - p1.x, p2.y - p1.y); cur.push(p2); line(p1, p2, p2.w); };
-  cv.onpointerup = cv.onpointercancel = () => { cur = null; };
+  // กันเมนูคลิกขวา (ปุ่มข้างปากกา/กดค้าง) และการลากรูป
+  w.addEventListener('contextmenu', (e) => e.preventDefault());
+  w.addEventListener('dragstart', (e) => e.preventDefault());
+  w.addEventListener('selectstart', (e) => e.preventDefault());
+  cv.onpointerdown = (e) => { e.preventDefault(); if (e.button > 0) return;   // ปุ่มข้างปากกา/คลิกขวา ไม่นับเป็นเส้น
+    try { cv.setPointerCapture(e.pointerId); } catch (_) {} cur = [pt(e)]; strokes.push(cur); w.querySelector('.sp-hint').style.opacity = 0; redraw(); };
+  cv.onpointermove = (e) => { if (!cur) return; e.preventDefault();
+    const evs = (e.getCoalescedEvents && e.getCoalescedEvents().length) ? e.getCoalescedEvents() : [e];   // จุดละเอียดทุกจุดจากปากกา
+    // กันเส้นดิ้น: ดึงจุดตามปากกาแบบหน่วงนิดหน่อย (ยิ่ง SMOOTH มาก เส้นยิ่งนิ่ง) + ข้ามจุดที่ขยับน้อยเกินไป
+    const SMOOTH = .7;
+    evs.forEach(ev => { const raw = pt(ev), p1 = cur[cur.length - 1];
+      const p2 = { x: p1.x + (raw.x - p1.x) * (1 - SMOOTH), y: p1.y + (raw.y - p1.y) * (1 - SMOOTH), w: p1.w * .7 + raw.w * .3 };
+      const d = Math.hypot(p2.x - p1.x, p2.y - p1.y); if (d < 1.2) return; len += d; cur.push(p2); if (cur.length > 2) seg(ctx, cur, cur.length - 1); }); lastRaw = pt(e); };
+  cv.onpointerup = cv.onpointercancel = () => { if (cur) { if (lastRaw) { const p1 = cur[cur.length - 1]; if (Math.hypot(lastRaw.x - p1.x, lastRaw.y - p1.y) > 1) { cur.push(lastRaw); seg(ctx, cur, cur.length - 1); } } tail(ctx, cur); } cur = null; lastRaw = null; };
   const close = () => { window.removeEventListener('resize', size); w.remove(); };
   window.addEventListener('resize', size); size();
   $('#spClear').onclick = () => { strokes = []; len = 0; redraw(); w.querySelector('.sp-hint').style.opacity = 1; };
@@ -1060,8 +1077,7 @@ function signaturePad(onDone) {
     const k = Math.min(1, 600 / bw, 220 / bh), out = document.createElement('canvas');
     out.width = Math.ceil(bw * k); out.height = Math.ceil(bh * k);
     const o = out.getContext('2d'); o.scale(k, k); o.translate(pad - x0, pad - y0); o.strokeStyle = '#000'; o.lineCap = o.lineJoin = 'round';
-    const ln = (a, b, wd) => { o.lineWidth = Math.max(wd, 2.6 / k); o.beginPath(); o.moveTo(a.x, a.y); o.lineTo(b.x, b.y); o.stroke(); };
-    strokes.forEach(st => { if (st.length === 1) ln(st[0], { x: st[0].x + .1, y: st[0].y }, st[0].w); for (let i = 1; i < st.length; i++) ln(st[i - 1], st[i], st[i].w); });
+    strokes.forEach(st => drawStroke(o, st, 2.6 / k));
     B.signature = out.toDataURL('image/png'); B.signed_at = now().toISOString();
     close(); if (onDone) onDone(); else drawSigBox();
   };
@@ -1132,9 +1148,9 @@ function receiptHtml(b, staff, copyLabel) {
     <div class="r-hr"></div>
     <div class="r-s r-j">${esc(rc.consent || '')}</div>
     ${b.signature ? `<div class="r-sigimg"><img src="${b.signature}" alt=""></div>` : ''}
-    <div class="r-sign${b.signature ? ' r-signed' : ''}">ลงชื่อ ........................................ ผู้ขาย</div>
+    <div class="r-sign${b.signature ? ' r-signed' : ''}"><span>ลงชื่อ</span><i></i><span>ผู้ขาย</span></div>
     <div class="r-c r-s">(${esc(c.name)})${b.signature && b.signed_at ? ` · เซ็นอิเล็กทรอนิกส์ ${esc(thTime(b.signed_at))}` : ''}</div>
-    <div class="r-sign">ลงชื่อ <span class="r-bname">${esc(buyerName(b, staff))}</span> ผู้รับซื้อ</div>
+    <div class="r-sign"><span>ลงชื่อ</span><i><b class="r-bname">${esc(buyerName(b, staff))}</b></i><span>ผู้รับซื้อ</span></div>
     <div class="r-hr"></div>
     <div class="r-c r-s">${esc(shop.footer || '')}</div>
     <div class="r-c r-s">${esc(b.bill_no)}</div>
@@ -1145,12 +1161,133 @@ function buyerName(b, staff) {
   return b.staff_name || fullNameOf(staff) || staffFull(b.staff_code) || (staff ? staff.code + '-' + staff.nickname : b.staff_code) || '';
 }
 function printReceipt(b, staff) {
+  if (btOn() && navigator.bluetooth) return btPrintReceipt(b, staff);
+  return chromePrint(b, staff);
+}
+function chromePrint(b, staff) {
   const t0 = document.title, t = fileTitle(b);
   if (t) { document.title = t; const back = () => { document.title = t0; window.removeEventListener('afterprint', back); }; window.addEventListener('afterprint', back); setTimeout(back, 60000); }
   const copies = Math.max(1, Math.min(3, num((S.settings.receipt || {}).copies) || 1));
   const labels = copies === 1 ? [''] : ['ลูกค้า', 'ร้าน', 'สำเนา'].slice(0, copies);
   $('#print').innerHTML = labels.map(l => receiptHtml(b, staff, l)).join('<div class="r-break"></div>');
   setTimeout(() => window.print(), 150);
+}
+
+// ---------------------------------------------------------------- เครื่องพิมพ์บลูทูธ (Y58 · ESC/POS ผ่าน Bluetooth LE)
+// พิมพ์ใบรับซื้อเป็นภาพ (ภาษาไทยครบ ลายเซ็น โลโก้) ตรงจาก Chrome — ไม่ต้องลงไดรเวอร์
+const BT = { dev: null, ch: null, busy: false };
+const BT_SV = [0x18f0, 0xff00, 0xffe0, 0xfee7, 0xae30, 0xff80, '49535343-fe7d-4ae5-8fa9-9fafd205e455', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2'];
+const btOn = () => !!load('dd_bt_print', false);
+const RW = 384, RF = '"Thonburi","Sukhumvit Set","IBM Plex Sans Thai","Tahoma",sans-serif', R_TH = 150;   // 58 มม. = 384 จุด · ความเข้ม "บาง"
+async function btAttach(dev) {
+  const srv = await dev.gatt.connect(); let ch = null;
+  for (const sv of await srv.getPrimaryServices()) { for (const c of await sv.getCharacteristics()) { if (!ch && (c.properties.writeWithoutResponse || c.properties.write)) ch = c; } }
+  if (!ch) throw new Error('ไม่พบช่องส่งข้อมูลของเครื่องพิมพ์');
+  if (BT.dev !== dev) dev.addEventListener('gattserverdisconnected', () => { BT.ch = null; });
+  BT.dev = dev; BT.ch = ch; store('dd_bt_name', dev.name || ''); store('dd_bt_print', true);
+}
+async function btPick() { const dev = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: BT_SV }); await btAttach(dev); toast('เชื่อมเครื่องพิมพ์ ' + (dev.name || '') + ' แล้ว'); }
+async function btReady() {
+  if (BT.ch && BT.dev && BT.dev.gatt.connected) return true;
+  if (BT.dev) { try { await btAttach(BT.dev); return true; } catch (e) {} }
+  if (navigator.bluetooth && navigator.bluetooth.getDevices) {
+    try { const ds = await navigator.bluetooth.getDevices(), nm = load('dd_bt_name', ''); const d = ds.find(x => x.name === nm) || null; if (d) { await btAttach(d); return true; } } catch (e) {}
+  }
+  return false;
+}
+const imgLoad = (src) => new Promise((ok) => { if (!src) return ok(null); const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src; });
+const segWords = (t) => ('Segmenter' in Intl) ? [...new Intl.Segmenter('th', { granularity: 'word' }).segment(t)].map(x => x.segment) : String(t).split(/(\s+)/);
+async function receiptCanvas(b, staff, copyLabel) {
+  const shop = S.settings.shop || {}, rc = S.settings.receipt || {}, M = metals(), c = b.customer || {};
+  const [logo, sig] = await Promise.all([imgLoad(shop.logo), imgLoad(b.signature)]);
+  const ops = [], T = (t, o = {}) => t != null && t !== '' && ops.push({ k: 't', t: String(t), ...o }), LR = (a, r, o = {}) => ops.push({ k: 'lr', a: String(a), r: String(r), ...o }), HR = () => ops.push({ k: 'hr' }), SP = (h) => ops.push({ k: 'sp', h });
+  if (logo) ops.push({ k: 'img', im: logo, w: 200, mono: 1 });
+  T(shop.name, { s: 30, b: 1, c: 1 }); T(shop.name2, { s: 20, c: 1 }); T(shop.branch, { s: 20, c: 1 });
+  T(shop.address, { s: 18, c: 1, wrap: 1 }); if (shop.phone) T('โทร ' + shop.phone + (shop.line ? ' · LINE ' + shop.line : ''), { s: 18, c: 1 });
+  HR(); T('ใบรับซื้อ' + (copyLabel ? ' (' + copyLabel + ')' : ''), { s: 28, b: 1, c: 1 });
+  if (b.status === 'void') T('*** ยกเลิกแล้ว ***', { s: 26, b: 1, c: 1 });
+  LR('เลขที่', b.bill_no, { b: 1 }); if (b.job_no) LR('งาน', b.job_no); LR('วันที่', thDateTime(b.created_at)); LR('ผู้รับซื้อ', buyerName(b, staff));
+  HR(); T('ผู้ขาย: ' + (c.name || ''), { b: 1, wrap: 1 }); T('เลขบัตร ' + fmtId(c.id_card), { s: 20 }); if (c.phone) T('โทร ' + c.phone, { s: 20 }); T(c.address, { s: 18, wrap: 1 });
+  HR();
+  b.items.forEach((it, i) => {
+    const lab = (M[it.metal] ? M[it.metal].label : it.metal);
+    if (it.pre_pct != null && it.pre_pct !== '') {
+      T((i + 1) + '. ' + lab + ' ' + (it.kind || ''), { b: 1 });
+      ops.push({ k: 'c3', a: '', m: 'ก่อนหลอม', r: 'หลังหลอม', s: 18, b: 1 });
+      ops.push({ k: 'c3', a: 'น้ำหนัก (ก.)', m: gram(it.pre_weight), r: gram(it.weight) });
+      ops.push({ k: 'c3', a: '% ทอง', m: String(it.pre_pct), r: String(it.pct) });
+    } else {
+      T((i + 1) + '. ' + lab + ' ' + it.pct + '% ' + (it.kind || ''));
+      if (it.pre_weight) T('หลอมแล้ว · ก่อนหลอม ' + gram(it.pre_weight) + ' ก.', { s: 18 });
+    }
+    LR(gram(it.weight) + ' ก. × ' + money(it.price_per_g), money(it.amount), { b: 1 });
+  });
+  HR(); LR('รวมเงิน', money(b.total) + ' บาท', { s: 28, b: 1 });
+  LR('น้ำหนักรวม', gram(b.items.reduce((s, i) => s + num(i.weight), 0)) + ' ก.', { s: 20 });
+  if (b.pay_cash) LR('รับเงินสด', money(b.pay_cash));
+  if (b.pay_transfer) { LR('รับโอน', money(b.pay_transfer)); T(b.pay_bank ? 'โอนเข้า ' + b.pay_bank : '', { s: 18, wrap: 1 }); }
+  if (b.note) T('หมายเหตุ: ' + b.note, { s: 18, wrap: 1 });
+  HR(); T(rc.consent, { s: 18, wrap: 1 });
+  if (sig) { SP(6); ops.push({ k: 'img', im: sig, w: 240, maxh: 110 }); } else SP(34);
+  ops.push({ k: 'sign', a: 'ลงชื่อ', r: 'ผู้ขาย' });
+  T('(' + (c.name || '') + ')', { s: 18, c: 1, wrap: 1 }); if (b.signature && b.signed_at) T('เซ็นอิเล็กทรอนิกส์ ' + thTime(b.signed_at), { s: 18, c: 1 });
+  SP(16); ops.push({ k: 'sign', a: 'ลงชื่อ', r: 'ผู้รับซื้อ', mid: buyerName(b, staff) });
+  HR(); T(shop.footer, { s: 20, c: 1, wrap: 1 }); T(b.bill_no, { s: 18, c: 1 }); SP(10);
+  const cv = document.createElement('canvas'); cv.width = RW; cv.height = 4000; const g = cv.getContext('2d');
+  const run = (dry) => {
+    let y = 12; g.fillStyle = '#000'; g.textBaseline = 'top';
+    for (const o of ops) {
+      if (o.k === 'sp') { y += o.h; continue; }
+      if (o.k === 'hr') { y += 6; if (!dry) for (let x = 0; x < RW; x += 8) g.fillRect(x, y, 5, 2); y += 10; continue; }
+      if (o.k === 'img') { let w = Math.min(o.w, o.im.naturalWidth), h = w * o.im.naturalHeight / o.im.naturalWidth; if (o.maxh && h > o.maxh) { w = w * o.maxh / h; h = o.maxh; }
+        if (!dry) { const t = document.createElement('canvas'); t.width = w; t.height = h; const tg = t.getContext('2d'); if (!o.mono) { tg.fillStyle = '#fff'; tg.fillRect(0, 0, w, h); } tg.drawImage(o.im, 0, 0, w, h);
+          if (o.mono) { tg.globalCompositeOperation = 'source-in'; tg.fillStyle = '#000'; tg.fillRect(0, 0, w, h); } g.drawImage(t, (RW - w) / 2, y); }
+        y += h + 4; continue; }
+      const sz = (o.s || 22) + 2, lh = sz * 1.42; g.font = (o.b ? '700 ' : '400 ') + sz + 'px ' + RF;
+      if (o.k === 'lr') { if (!dry) { g.textAlign = 'left'; g.fillText(o.a, 4, y); g.textAlign = 'right'; g.fillText(o.r, RW - 4, y); g.textAlign = 'left'; } y += lh; continue; }
+      if (o.k === 'sign') { if (!dry) { g.textAlign = 'left'; g.fillText(o.a, 4, y); g.textAlign = 'right'; g.fillText(o.r, RW - 4, y); g.textAlign = 'left';
+          const x0 = 4 + g.measureText(o.a).width + 6, x1 = RW - 4 - g.measureText(o.r).width - 6, ly = y + sz * 1.05;
+          for (let x = x0; x < x1; x += 4) g.fillRect(x, ly, 2, 2);
+          if (o.mid) { g.font = '700 ' + sz + 'px ' + RF; g.textAlign = 'center'; g.fillText(o.mid, (x0 + x1) / 2, y - 2); g.textAlign = 'left'; } }
+        y += lh; continue; }
+      if (o.k === 'c3') { if (!dry) { g.textAlign = 'left'; g.fillText(o.a, 4, y); g.textAlign = 'right'; g.fillText(o.m, RW * .7, y); g.fillText(o.r, RW - 4, y); g.textAlign = 'left'; } y += lh; continue; }
+      const lines = []; if (o.wrap) { let ln = ''; for (const w of segWords(o.t)) { if (g.measureText(ln + w).width > RW - 8 && ln) { lines.push(ln); ln = w.trimStart(); } else ln += w; } if (ln) lines.push(ln); } else lines.push(o.t);
+      for (const ln of lines) { if (!dry) { g.textAlign = o.c ? 'center' : 'left'; g.fillText(ln, o.c ? RW / 2 : 4, y); g.textAlign = 'left'; } y += lh; }
+    }
+    return Math.ceil(y);
+  };
+  const h = run(true); cv.height = h; g.fillStyle = '#fff'; g.fillRect(0, 0, RW, h); run(false);
+  return cv;
+}
+function escposRaster(cv) {
+  const w = cv.width, h = cv.height, d = cv.getContext('2d').getImageData(0, 0, w, h).data, bw = w / 8, out = [new Uint8Array([0x1B, 0x40])];
+  for (let y0 = 0; y0 < h; y0 += 128) { const rows = Math.min(128, h - y0), buf = new Uint8Array(8 + bw * rows); buf.set([0x1D, 0x76, 0x30, 0, bw & 255, bw >> 8, rows & 255, rows >> 8]);
+    for (let y = 0; y < rows; y++) for (let x = 0; x < w; x++) { const i = ((y0 + y) * w + x) * 4; if (d[i] * .3 + d[i + 1] * .59 + d[i + 2] * .11 < R_TH) buf[8 + y * bw + (x >> 3)] |= 0x80 >> (x & 7); }
+    out.push(buf); }
+  out.push(new Uint8Array([0x1B, 0x64, 4]));
+  return out;
+}
+async function btSend(parts) {
+  const ch = BT.ch, wr = ch.properties.writeWithoutResponse ? (v) => ch.writeValueWithoutResponse(v) : (v) => ch.writeValue(v);
+  for (const p of parts) for (let i = 0; i < p.length; i += 100) { await wr(p.slice(i, i + 100)); await new Promise(r => setTimeout(r, 20)); }
+}
+async function btPrintReceipt(b, staff) {
+  if (BT.busy) return toast('เครื่องพิมพ์กำลังพิมพ์อยู่ — รอสักครู่', 'warn');
+  if (!(await btReady())) return btAsk(b, staff);
+  BT.busy = true;
+  try {
+    const copies = Math.max(1, Math.min(3, num((S.settings.receipt || {}).copies) || 1));
+    const labels = copies === 1 ? [''] : ['ลูกค้า', 'ร้าน', 'สำเนา'].slice(0, copies);
+    toast('กำลังพิมพ์ใบรับซื้อ…');
+    for (const l of labels) await btSend(escposRaster(await receiptCanvas(b, staff, l)));
+  } catch (e) { BT.ch = null; BT.busy = false; toast('พิมพ์ผ่านบลูทูธไม่สำเร็จ: ' + e.message, 'err'); return btAsk(b, staff); }
+  BT.busy = false;
+}
+function btAsk(b, staff) {
+  modal(`<h2>🖨️ เชื่อมเครื่องพิมพ์บลูทูธ</h2><p class="muted">เปิดเครื่องพิมพ์ Y58 แล้วกด "เชื่อมแล้วพิมพ์" → เลือก <b>${esc(load('dd_bt_name', '') || 'Y58')}</b> ในหน้าต่างที่เด้งขึ้น</p>
+    <div class="row end"><button class="btn ghost" id="btChrome">พิมพ์ผ่านหน้าต่าง Chrome</button><button class="btn gold" id="btGo">เชื่อมแล้วพิมพ์</button></div>`, { sticky: true });
+  $('#btGo').onclick = async () => { try { await btPick(); closeModal(); btPrintReceipt(b, staff); } catch (e) { if (e.name !== 'NotFoundError') toast('เชื่อมไม่สำเร็จ: ' + e.message, 'err'); } };
+  $('#btChrome').onclick = () => { closeModal(); chromePrint(b, staff); };
 }
 
 // ---------------------------------------------------------------- BILLS / summary
@@ -2193,7 +2330,13 @@ function renderMore() {
   ];
   shell('เพิ่มเติม', `<div class="card list">${items.map(i => `<button class="list-row" data-go3="${i[0]}"><b>${i[1]}</b><span class="muted sm">${i[2]} ›</span></button>`).join('')}</div>
     <div class="card"><h2>เครื่องนี้</h2><p class="muted sm">เครื่อง ${esc(S.device.device_id)} · ${esc(S.device.name)} · เวอร์ชัน ${APP_VERSION}${DEMO ? ' · โหมดทดลอง' : ''}</p>
-    <div class="row"><button class="btn ghost" id="testPrint">ทดสอบพิมพ์</button><button class="btn ghost" id="testCard">ทดสอบเครื่องอ่านบัตร</button></div></div>`);
+    <div class="row"><button class="btn ghost" id="testPrint">ทดสอบพิมพ์</button><button class="btn ghost" id="testCard">ทดสอบเครื่องอ่านบัตร</button></div></div>
+    <div class="card"><h2>เครื่องพิมพ์ใบเสร็จ</h2>
+    <label class="chk-row"><input type="checkbox" id="btOn" ${btOn() ? 'checked' : ''}> <span>พิมพ์ผ่าน<b>บลูทูธ</b> (เครื่อง Y58) — ไม่ต้องลงไดรเวอร์</span></label>
+    <p class="muted sm" id="btSt">${navigator.bluetooth ? (BT.ch ? 'เชื่อมอยู่: ' + esc(load('dd_bt_name', '')) : (load('dd_bt_name', '') ? 'เครื่องที่ใช้ล่าสุด: ' + esc(load('dd_bt_name', '')) + ' (ยังไม่ได้เชื่อมรอบนี้)' : 'ยังไม่ได้เชื่อมเครื่องพิมพ์')) : 'เบราว์เซอร์นี้ไม่รองรับบลูทูธ — ใช้ Google Chrome'}</p>
+    <div class="row"><button class="btn ghost" id="btPair">เชื่อมเครื่องพิมพ์บลูทูธ</button></div></div>`);
+  $('#btOn').onchange = (e) => { store('dd_bt_print', e.target.checked); toast(e.target.checked ? 'ใช้การพิมพ์ผ่านบลูทูธ' : 'ใช้หน้าต่างพิมพ์ของ Chrome'); };
+  $('#btPair').onclick = async () => { if (!navigator.bluetooth) return toast('ใช้ Google Chrome เพื่อเชื่อมบลูทูธ', 'err'); try { await btPick(); renderMore(); } catch (e) { if (e.name !== 'NotFoundError') toast('เชื่อมไม่สำเร็จ: ' + e.message, 'err'); } };
   $$('[data-go3]').forEach(b => b.onclick = () => b.dataset.go3 === 'todayprice' ? dailyPriceModal() : go(b.dataset.go3));
   $('#testPrint').onclick = () => printReceipt({ bill_no: 'TEST-0000', created_at: now().toISOString(), staff_code: me().code, customer: { name: 'ทดสอบพิมพ์', id_card: '1234567890123' }, items: [{ metal: 'gold', kind: 'ทดสอบ', pct: 96.5, weight: 1, price_per_g: 1000, amount: 1000 }], total: 1000, pay_cash: 1000, pay_transfer: 0 }, me());
   $('#testCard').onclick = async () => { try { const r = await fetch((CFG.HELPER_URL || 'http://127.0.0.1:8765') + '/status').then(x => x.json()); toast(r.reader ? 'เจอเครื่องอ่าน: ' + r.reader : 'โปรแกรมทำงาน แต่ไม่เจอเครื่องอ่านบัตร', r.reader ? 'ok' : 'warn'); } catch (e) { toast('ไม่พบโปรแกรมเครื่องอ่านบัตรในเครื่องนี้', 'err'); } };

@@ -1,5 +1,5 @@
 // เก็บไฟล์แอปไว้ในเครื่อง เพื่อให้เปิดได้แม้ไม่มีอินเทอร์เน็ต
-const CACHE = 'dd-shop-v1.14.0';
+const CACHE = 'dd-shop-v1.15.1';
 const FILES = ['./', 'index.html', 'style.css', 'app.js', 'demo.js', 'config.js', 'manifest.webmanifest', 'dd-icon-v2-192.png', 'dd-icon-v2-512.png'];
 
 self.addEventListener('install', e => {
