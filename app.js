@@ -4,7 +4,7 @@
 'use strict';
 const CFG = window.DD_CONFIG || {};
 const DEMO = !CFG.SUPABASE_URL;
-const APP_VERSION = '1.15.2';
+const APP_VERSION = '1.16.0';
 
 // ---------------------------------------------------------------- utils
 const $ = (s, el = document) => el.querySelector(s);
@@ -538,7 +538,8 @@ function renderBuy() {
     <section class="card" data-card="2">
       <div class="card-h"><h2>รายการ</h2><span class="muted sm">${B.items.length} รายการ</span></div>
       <div class="seg metal">${metalEntries(M).map(([k, m]) => `<button data-metal="${k}" class="${e.metal === k ? 'on' : ''}">${esc(m.label)}</button>`).join('')}</div>
-      <div class="chips">${(M[e.metal] && M[e.metal].kinds || []).map(k => `<button data-kind="${esc(k)}" class="${e.kind === k ? 'on' : ''}">${esc(k)}</button>`).join('')}</div>
+      <div class="chips">${(M[e.metal] && M[e.metal].kinds || []).filter(k => k.trim() !== 'อื่นๆ').map(k => `<button data-kind="${esc(k)}" class="${e.kind === k ? 'on' : ''}">${esc(k)}</button>`).join('')}<button data-kind="__other" class="${e.kind === '__other' ? 'on' : ''}">อื่นๆ…</button></div>
+      <div id="kindOtherRow" ${e.kind === '__other' ? '' : 'hidden'}><label>ระบุชื่อชิ้นงาน<input id="kindOther" maxlength="40" placeholder="เช่น พระทองคำ, ตะขอ, จี้เพชรหลุด" value="${esc(e.kindOther || '')}"></label></div>
       <div class="lbl">เปอร์เซ็นต์ (%) <span class="muted sm">${e.destination === 'lump' ? '· ก่อนหลอม' : ''}</span></div>
       <div class="chips pct">${tiers.map(t => `<button data-pct="${t.pct}" class="${num(e.pct) === t.pct ? 'on' : ''}">${t.pct}%<small>${money(t.price)}</small></button>`).join('')}
         <input id="pct" inputmode="decimal" placeholder="ใส่เอง" value="${esc(e.pct)}" class="pct-in"></div>
@@ -588,8 +589,10 @@ function bindBuy() {
   const cc = $('#clearCust'); if (cc) cc.onclick = () => { B.customer = null; renderBuy(); };
   const ph = $('#phone'); if (ph) ph.oninput = () => { B.customer.phone = ph.value.trim(); };
 
-  $$('[data-metal]').forEach(b => b.onclick = () => { e.metal = b.dataset.metal; e.kind = (metals()[e.metal].kinds || [''])[0]; e.pct = ''; e.priceEdited = false; e.amountEdited = false; e.price = ''; e.amount = ''; renderBuy(); });
-  $$('[data-kind]').forEach(b => b.onclick = () => { e.kind = b.dataset.kind; $$('[data-kind]').forEach(x => x.classList.toggle('on', x === b)); });
+  $$('[data-metal]').forEach(b => b.onclick = () => { e.metal = b.dataset.metal; e.kind = (metals()[e.metal].kinds || []).filter(k => k.trim() !== 'อื่นๆ')[0] || '__other'; e.pct = ''; e.priceEdited = false; e.amountEdited = false; e.price = ''; e.amount = ''; renderBuy(); });
+  $$('[data-kind]').forEach(b => b.onclick = () => { e.kind = b.dataset.kind; $$('[data-kind]').forEach(x => x.classList.toggle('on', x === b));
+    const row = $('#kindOtherRow'); if (row) { row.hidden = e.kind !== '__other'; if (e.kind === '__other') $('#kindOther').focus(); } });
+  if ($('#kindOther')) $('#kindOther').oninput = (ev) => { e.kindOther = ev.target.value; };
   $$('[data-dest]').forEach(b => b.onclick = () => { e.destination = b.dataset.dest; renderBuy(); });
   $$('[data-pct]').forEach(b => b.onclick = () => { e.pct = b.dataset.pct; $('#pct').value = e.pct; $$('[data-pct]').forEach(x => x.classList.toggle('on', x === b)); e.priceEdited = false; recalc(); $('#weight').focus(); });
   $('#pct').oninput = (ev) => { e.pct = ev.target.value; $$('[data-pct]').forEach(x => x.classList.toggle('on', num(x.dataset.pct) === num(e.pct))); e.priceEdited = false; recalc(); };
@@ -623,10 +626,12 @@ function addItem() {
   if (!num(e.pct) || num(e.pct) > 100) return toast('ใส่เปอร์เซ็นต์ให้ถูกต้อง', 'err');
   if (!num(e.weight)) return toast('ใส่น้ำหนัก', 'err');
   if (!num(e.amount)) return toast('ยังไม่มีราคา — ใส่ราคา/กรัมเอง หรือให้เจ้าของตั้งราคา %', 'err');
+  const kind = e.kind === '__other' ? String(e.kindOther || '').trim() : e.kind;
+  if (e.kind === '__other' && !kind) { toast('ระบุชื่อชิ้นงาน (เช่น พระทองคำ)', 'err'); const k = $('#kindOther'); if (k) k.focus(); return; }
   const lump = e.destination === 'lump';
-  S.buy.items.push({ metal: e.metal, kind: e.kind, pct: num(e.pct), weight: num(e.weight), price_per_g: num(e.price), amount: num(e.amount), destination: e.destination,
+  S.buy.items.push({ metal: e.metal, kind, pct: num(e.pct), weight: num(e.weight), price_per_g: num(e.price), amount: num(e.amount), destination: e.destination,
     pre_weight: lump ? num(e.weight) : null, pre_pct: lump ? num(e.pct) : null, pre_price: num(e.price), pre_amount: num(e.amount), price_edited: e.priceEdited || e.amountEdited });
-  Object.assign(e, { pct: '', weight: '', price: '', amount: '', pre_weight: '', priceEdited: false, amountEdited: false });
+  Object.assign(e, { pct: '', weight: '', price: '', amount: '', pre_weight: '', priceEdited: false, amountEdited: false, kindOther: '' });
   S.buy.cash = null; renderBuy();
 }
 
