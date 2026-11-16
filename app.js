@@ -4,7 +4,7 @@
 'use strict';
 const CFG = window.DD_CONFIG || {};
 const DEMO = !CFG.SUPABASE_URL;
-const APP_VERSION = '1.16.1';
+const APP_VERSION = '1.16.2';
 
 // ---------------------------------------------------------------- utils
 const $ = (s, el = document) => el.querySelector(s);
@@ -1331,7 +1331,7 @@ function escposRaster(cv) {
   for (let y0 = 0; y0 < h; y0 += 128) { const rows = Math.min(128, h - y0), buf = new Uint8Array(8 + bw * rows); buf.set([0x1D, 0x76, 0x30, 0, bw & 255, bw >> 8, rows & 255, rows >> 8]);
     for (let y = 0; y < rows; y++) for (let x = 0; x < w; x++) { const i = ((y0 + y) * w + x) * 4; if (d[i] * .3 + d[i + 1] * .59 + d[i + 2] * .11 < R_TH) buf[8 + y * bw + (x >> 3)] |= 0x80 >> (x & 7); }
     out.push(buf); }
-  out.push(new Uint8Array([0x1B, 0x64, 4]));
+  out.push(new Uint8Array([0x1B, 0x4A, 200, 0x1B, 0x4A, 40]));   // ป้อนกระดาษ ~30 มม. ให้ท้ายใบพ้นใบมีดฉีก
   return out;
 }
 async function btSend(parts) {
