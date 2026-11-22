@@ -361,3 +361,19 @@ table.cmp.big{font-size:18px}table.cmp.big tr.tot td{font-size:22px}
 .r-tbl{width:100%;border-collapse:collapse;font-size:9.5px;margin:1px 0}.r-tbl th,.r-tbl td{padding:0 1px;text-align:right}.r-tbl th:first-child,.r-tbl td:first-child{text-align:left}.r-tbl th{font-weight:700}
 
 .rcpt-preview.big{max-height:70vh;overflow:auto}.rcpt-preview.big .rcpt{zoom:1.7}
+
+/* ตั๋วจำนำ */
+.pw-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;align-items:start}@media(max-width:900px){.pw-grid{grid-template-columns:1fr}}
+.pw-grid .f2,.modal .f2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.pw-grid .f3,.modal .f3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+@media(max-width:600px){.pw-grid .f3,.modal .f3{grid-template-columns:1fr 1fr}}
+.row.tight{gap:6px;flex-wrap:nowrap}.row.tight input{min-width:0}
+.pw-photos{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.pw-ph{height:120px;border:2px dashed #C8B98A;border-radius:12px;display:flex;align-items:center;justify-content:center;background:#FAF6EA;color:#7A6A3A;cursor:pointer;overflow:hidden}
+.pw-ph img{width:100%;height:100%;object-fit:cover}
+.pw-calc .r{display:flex;justify-content:space-between;gap:8px;padding:6px 0}.pw-calc .neg{color:#B3392B}.pw-calc .tot{border-top:2px solid var(--ol,#4B5320);margin-top:6px;padding-top:8px;font-size:1.15em;font-weight:600}
+.gain{background:#EEF3E2;border-radius:10px;padding:8px 12px;color:#3B5A1E;margin:10px 0}.gain.bad{background:#FDE2DE;color:#B3392B}
+.pw-row{display:flex;justify-content:space-between;gap:12px;width:100%;text-align:left;background:#fff;border:1px solid #E3E0D4;border-radius:12px;padding:12px 14px;margin-bottom:8px;cursor:pointer;font:inherit;color:inherit}
+.pw-row .right{text-align:right;white-space:nowrap}
+.pwst{display:inline-block;font-size:12px;padding:3px 10px;border-radius:999px;background:#eee}.pwst.s1{background:#FFF1CC;color:#8A6400}.pwst.s2{background:#FDE2DE;color:#B3392B}.pwst.s3{background:#E3EEDB;color:#2E6B1E}.pwst.s4{background:#E3E9F5;color:#2B4D8A}.pwst.s5{background:#EEE;color:#888;text-decoration:line-through}
+.act4{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.btn.danger{color:#B3392B;border-color:#E4B8B0}

@@ -4,7 +4,7 @@
 'use strict';
 const CFG = window.DD_CONFIG || {};
 const DEMO = !CFG.SUPABASE_URL;
-const APP_VERSION = '1.16.2';
+const APP_VERSION = '1.17.0';
 
 // ---------------------------------------------------------------- utils
 const $ = (s, el = document) => el.querySelector(s);
@@ -186,6 +186,7 @@ const NAV = [
   { id: 'stock', label: 'สต๊อก/หลอม', icon: 'M3 7l9-4 9 4-9 4-9-4zM3 12l9 4 9-4M3 17l9 4 9-4' },
   { id: 'bills', label: 'สรุปวันนี้', icon: 'M4 19V9M10 19V5M16 19v-7M22 19H2' },
   { id: 'sell', label: 'ขาย', icon: 'M12 21V3M5 14l7 7 7-7' },
+  { id: 'pawn', label: 'ตั๋วจำนำ', icon: 'M3 7h18v3a2 2 0 000 4v3H3v-3a2 2 0 000-4zM9 7v10' },
   { id: 'more', label: 'เพิ่มเติม', icon: 'M4 6h16M4 12h16M4 18h16' }
 ];
 const icon = (d) => `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
@@ -215,7 +216,7 @@ function go(screen) {
   if (me().must_change_pin && screen !== 'pin') screen = 'pin';
   S.screen = screen;
   window.scrollTo(0, 0);
-  ({ buy: renderBuy, bills: renderBills, customers: renderCustomers, more: renderMore, settings: renderSettings, staff: renderStaff, audit: renderAudit, pin: renderPin, requests: renderRequests, stock: renderStock, sell: renderSell }[screen] || renderBuy)();
+  ({ buy: renderBuy, bills: renderBills, customers: renderCustomers, more: renderMore, settings: renderSettings, staff: renderStaff, audit: renderAudit, pin: renderPin, requests: renderRequests, stock: renderStock, sell: renderSell, pawn: renderPawn }[screen] || renderBuy)();
   if (screen !== 'pin' && needName()) { setTimeout(nameModal, 100); return; }
   // เจ้าของเข้าระบบวันแรกของวัน และยังไม่ได้ตั้งราคาวันนี้ → ถามว่าจะใช้ราคาแบบไหน
   if (isOwner() && S.session.token && screen !== 'pin' && S.settings && S.settings.prices && S.settings.prices.date !== bkkDate() && S.priceAsked !== bkkDate()) {
@@ -583,7 +584,7 @@ function bindBuy() {
   const stp = $('#setTodayPrice'); if (stp) stp.onclick = dailyPriceModal;
   $$('.stepper [data-step]').forEach(b => b.onclick = () => { S.buyStep = +b.dataset.step; renderBuy(); });
   $$('[data-next]').forEach(b => b.onclick = () => { S.buyStep = +b.dataset.next; renderBuy(); });
-  const rc = $('#readCard'); if (rc) rc.onclick = readCard;
+  const rc = $('#readCard'); if (rc) rc.onclick = () => readCard();
   const fc = $('#findCust'); if (fc) fc.onclick = () => customerSearchModal(c => { setCustomer(c); });
   const mc = $('#manualCust'); if (mc) mc.onclick = manualCustomerModal;
   const cc = $('#clearCust'); if (cc) cc.onclick = () => { B.customer = null; renderBuy(); };
@@ -636,7 +637,7 @@ function addItem() {
 }
 
 // ----- card reader
-async function readCard() {
+async function readCard(onRead) {
   const btn = $('#readCard'); busy(btn, true);
   const hint = $('#cardHint'); if (hint) hint.textContent = 'กำลังอ่านบัตร...';
   try {
@@ -647,7 +648,7 @@ async function readCard() {
     let known = null;
     try { known = await idb.get('customers', d.cid); } catch (e) { /* ignore */ }
     if (S.online && S.session.token) { try { const g = await api('get_customer', { p_token: S.session.token, p_id: d.cid }); if (g) known = { ...g.customer, ...(known || {}) , bill_count: g.customer.bill_count }; } catch (e) { /* ignore */ } }
-    setCustomer({ id_card: d.cid, name: d.name_th, name_en: d.name_en, birth: d.birth, gender: d.gender, address: d.address, card_issue: d.issue, card_expire: d.expire, photo: d.photo || null, phone: known ? known.phone : '', bill_count: known ? known.bill_count : 0, source: 'card' });
+    (onRead || setCustomer)({ id_card: d.cid, name: d.name_th, name_en: d.name_en, birth: d.birth, gender: d.gender, address: d.address, card_issue: d.issue, card_expire: d.expire, photo: d.photo || null, phone: known ? known.phone : '', bill_count: known ? known.bill_count : 0, source: 'card' });
     toast('อ่านบัตรสำเร็จ');
   } catch (e) {
     busy(btn, false);
@@ -1035,11 +1036,11 @@ function drawSigBox() {
   if ($('#sigDel')) $('#sigDel').onclick = () => { B.signature = null; B.signed_at = null; drawSigBox(); };
 }
 // หน้ากระดาษขาวเต็มจอ ให้ลูกค้าเซ็นตรงไหนก็ได้ → ตัดเฉพาะส่วนที่มีลายเซ็น
-function signaturePad(onDone) {
-  const B = S.buy, c = B.customer || {}, M = metals();
-  const desc = B.items.map(it => `${(M[it.metal] || {}).label || it.metal} ${it.pct}% ${gram(it.weight)} ก.`).join(' · ');
+function signaturePad(onDone, T) {
+  const B = T ? T.obj : S.buy, c = B.customer || {}, M = metals();
+  const desc = T ? T.desc : B.items.map(it => `${(M[it.metal] || {}).label || it.metal} ${it.pct}% ${gram(it.weight)} ก.`).join(' · ');
   const w = document.createElement('div'); w.className = 'sigpad'; w.id = 'sigpad';
-  w.innerHTML = `<div class="sp-top"><span>✍️ ลูกค้ายืนยันการขาย</span><b>${esc(c.name || '')}</b><span class="sp-desc">${esc(desc)}</span><span class="sp-amt">${money(buyTotal())} ฿</span></div>
+  w.innerHTML = `<div class="sp-top"><span>✍️ ${T && T.title ? T.title : 'ลูกค้ายืนยันการขาย'}</span><b>${esc(c.name || '')}</b><span class="sp-desc">${esc(desc)}</span><span class="sp-amt">${money(T ? T.amount : buyTotal())} ฿</span></div>
     <div class="sp-paper"><div class="sp-hint">เซ็นชื่อตรงไหนก็ได้บนหน้านี้</div><canvas id="spc"></canvas></div>
     <div class="sp-bar"><button class="btn ghost" id="spCancel">✕ ยกเลิก</button><button class="btn ghost" id="spClear">↺ ล้าง เซ็นใหม่</button><button class="btn gold grow" id="spDone">✓ เซ็นเสร็จ</button></div>`;
   document.body.appendChild(w);
@@ -1356,6 +1357,241 @@ function btAsk(b, staff) {
   $('#btGo').onclick = async () => { try { await btPick(); closeModal(); btPrintReceipt(b, staff); } catch (e) { if (e.name !== 'NotFoundError') toast('เชื่อมไม่สำเร็จ: ' + e.message, 'err'); } };
   $('#btChrome').onclick = () => { closeModal(); chromePrint(b, staff); };
 }
+
+// ---------------------------------------------------------------- ตั๋วจำนำ (v1.17.0)
+const PAWN_EV = { buy: 'รับซื้อตั๋ว', renew: 'ต่อดอก', redeem: 'ไถ่ทอง', sell: 'ขายตั๋ว' };
+const PAWN_ST = { holding: ['รอไถ่', 's1'], redeemed: ['ไถ่แล้ว', 's3'], sold: ['ขายแล้ว', 's4'], void: ['ยกเลิก', 's5'] };
+const BAHT_G = 15.16;   // ทองรูปพรรณ 1 บาท ≈ 15.16 กรัม
+const pawnCfg = () => Object.assign({ margin_pct: 5, interest_pct: 1, shops: ['สถานธนานุบาล กทม.', 'สถานธนานุบาล (รัฐ)', 'โรงรับจำนำเอกชน'] }, (S.settings && S.settings.pawn) || {});
+const isoDate = (d) => new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+const daysBetween = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 864e5);
+function newPawn() {
+  const c = pawnCfg();
+  return { id: uuid(), customer: null, pawnshop: c.shops[0] || '', ticket_no: '', pawn_date: '', due_date: '', principal: '', interest_pct: c.interest_pct,
+    metal: 'gold', item_desc: '', weight: '', unit: 'baht', est_pct: '96.5', redeem_in: 3, pay: '', payEdited: false, pay_cash: '', pay_bank: '', photo_front: null, photo_back: null, note: '' };
+}
+function pawnCalc(P) {
+  const grams = num(P.weight) * (P.unit === 'baht' ? BAHT_G : 1);
+  const value = grams > 0 && num(P.est_pct) > 0 ? Math.floor(priceFor(P.metal, num(P.est_pct)) * grams) : 0;
+  const until = isoDate(new Date(now().getTime() + num(P.redeem_in) * 864e5));
+  const months = P.pawn_date ? Math.max(1, Math.ceil(daysBetween(P.pawn_date, until) / 30)) : 1;
+  const interest = Math.ceil(num(P.principal) * num(P.interest_pct) / 100 * months);
+  const margin = Math.ceil(value * num(pawnCfg().margin_pct) / 100);
+  const suggest = Math.max(0, Math.floor((value - num(P.principal) - interest - margin) / 100) * 100);
+  const pay = P.payEdited ? num(P.pay) : suggest;
+  return { grams, value, months, interest, margin, suggest, pay, profit: value - num(P.principal) - interest - pay };
+}
+async function renderPawn() {
+  if (S.pawnView === 'new') return renderPawnForm();
+  shell('ตั๋วจำนำ', '<div class="center"><span class="spin big"></span></div>');
+  let list = [];
+  try { list = await api('pawn_list', { p_token: S.session.token, p_scope: 'all' }); }
+  catch (e) { if (e.message === 'SESSION_INVALID') return sessionExpired(); $('.main').innerHTML = `<h1 class="screen-title">ตั๋วจำนำ</h1><div class="card"><p class="muted">ต้องออนไลน์เพื่อใช้เมนูตั๋วจำนำ (${esc(errText(e))})</p></div>`; return; }
+  if (S.screen !== 'pawn') return;
+  S.pawnList = list;
+  const hold = list.filter(t => t.status === 'holding'), near = hold.filter(t => t.days_left != null && t.days_left <= 7);
+  const f = S.pawnFilter || 'holding';
+  const shown = list.filter(t => f === 'all' || (f === 'near' ? (t.status === 'holding' && t.days_left != null && t.days_left <= 7) : t.status === f));
+  const dl = (t) => t.status !== 'holding' ? '' : t.days_left == null ? 'ไม่ระบุวันครบ' : t.days_left < 0 ? `⚠ เลยกำหนด ${-t.days_left} วัน` : t.days_left <= 7 ? `⚠ เหลือ ${t.days_left} วัน` : `เหลือ ${t.days_left} วัน`;
+  $('.main').innerHTML = `<h1 class="screen-title">ตั๋วจำนำ <button class="btn gold" id="pwNew">+ รับซื้อตั๋วจำนำ</button></h1>
+    <div class="flow"><div class="kpi"><span>ตั๋วในมือ</span><b>${hold.length} ใบ</b><small>รอไถ่ / รอขายต่อ</small></div>
+      <div class="kpi out"><span>เงินจมในตั๋ว</span><b>${money(hold.reduce((t, x) => t + num(x.cost), 0))}</b><small>ยังไม่รวมเงินต้นที่ต้องไถ่ ${money(hold.reduce((t, x) => t + num(x.principal), 0))}</small></div>
+      <div class="kpi ${near.length ? 'wait' : ''}"><span>ใกล้ครบกำหนด (≤7 วัน)</span><b class="${near.length ? 'bad' : ''}">${near.length} ใบ</b><small>แจ้งเตือน LINE เจ้าของอัตโนมัติ</small></div></div>
+    <div class="card"><div class="filter">${[['holding', 'รอไถ่'], ['near', 'ใกล้ครบ'], ['redeemed', 'ไถ่แล้ว'], ['sold', 'ขายแล้ว'], ['all', 'ทั้งหมด']].map(([k, l]) => `<button data-pf="${k}" class="${f === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    ${shown.map(t => `<button class="pw-row" data-pw="${t.id}"><div><b>${esc(t.ticket_no)} · ${esc(t.item_desc || '')}</b><br><span class="muted sm">${esc(t.pawnshop || '')} · ${esc(t.doc_no)} · ${esc((t.customer || {}).name || '')} · ครบ ${t.due_date ? esc(dueTh(t.due_date)) : '-'}</span></div>
+      <div class="right"><span class="pwst ${(PAWN_ST[t.status] || ['', ''])[1]} ${t.status === 'holding' && t.days_left != null && t.days_left <= 7 ? 's2' : ''}">${(PAWN_ST[t.status] || [t.status])[0]}${dl(t) ? ' · ' + dl(t) : ''}</span><br><span class="sm">ต้น ${money(t.principal)} · ทุน ${money(t.cost)}</span></div></button>`).join('') || '<p class="muted center-t">ไม่มีรายการ</p>'}</div>`;
+  $('#pwNew').onclick = () => { S.pawn = newPawn(); S.pawnView = 'new'; renderPawn(); };
+  $$('[data-pf]').forEach(b => b.onclick = () => { S.pawnFilter = b.dataset.pf; renderPawn(); });
+  $$('[data-pw]').forEach(b => b.onclick = () => pawnDetail(b.dataset.pw));
+}
+function renderPawnForm() {
+  const P = S.pawn || (S.pawn = newPawn()), c = P.customer, K = pawnCfg();
+  const opts = metalEntries().map(([k, m]) => `<option value="${k}" ${P.metal === k ? 'selected' : ''}>${esc(m.label)}</option>`).join('');
+  shell('รับซื้อตั๋วจำนำ', `<div class="pw-grid"><div>
+    <div class="card"><div class="card-h"><h2>ผู้ขายตั๋ว</h2><button class="btn ghost sm" id="pwBack">← กลับรายการ</button></div>
+      ${c ? `<div class="cust">${c.photo ? `<img class="cust-photo" src="data:image/jpeg;base64,${c.photo}" alt="">` : ''}<div><b>${esc(c.name)}</b><br><span class="muted sm">${esc(fmtId(c.id_card))}</span><br><span class="sm">⚠ ตรวจว่าชื่อตรงกับชื่อผู้จำนำในตั๋ว</span></div></div>
+        <div class="row"><button class="btn ghost" id="readCard">อ่านบัตรใหม่</button><button class="btn ghost" id="pwManual">พิมพ์เอง</button></div>`
+      : `<button class="btn gold block xl" id="readCard">${icon('M3 5h18v14H3zM7 9h4M7 13h6M15 9h2v4h-2z')} อ่านบัตรประชาชน</button><p class="muted sm" id="cardHint"></p><button class="btn ghost sm" id="pwManual">หรือพิมพ์ชื่อ/เลขบัตรเอง</button>`}</div>
+    <div class="card"><h2>ข้อมูลตั๋ว</h2>
+      <div class="pw-photos"><label class="pw-ph">${P.photo_front ? `<img src="${P.photo_front}">` : '📷 รูปตั๋ว (หน้า)'}<input type="file" accept="image/*" capture="environment" data-ph="photo_front" hidden></label>
+        <label class="pw-ph">${P.photo_back ? `<img src="${P.photo_back}">` : '📷 รูปตั๋ว (หลัง)'}<input type="file" accept="image/*" capture="environment" data-ph="photo_back" hidden></label></div>
+      <div class="f2"><label>โรงรับจำนำ<input id="pw_pawnshop" list="pwShops" value="${esc(P.pawnshop)}"><datalist id="pwShops">${K.shops.map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>
+        <label>เลขที่ตั๋ว *<input id="pw_ticket_no" value="${esc(P.ticket_no)}"></label></div>
+      <div class="f3"><label>วันที่จำนำ<input type="date" id="pw_pawn_date" value="${esc(P.pawn_date)}"></label><label>ครบกำหนด<input type="date" id="pw_due_date" value="${esc(P.due_date)}"></label>
+        <label>เงินต้น (บาท) *<input id="pw_principal" inputmode="decimal" value="${esc(P.principal)}"></label></div>
+      <div class="f3"><label>ทรัพย์ในตั๋ว<input id="pw_item_desc" placeholder="เช่น สร้อยคอ 2 บาท" value="${esc(P.item_desc)}"></label><label>ชนิด<select id="pw_metal">${opts}</select></label>
+        <label>ดอกเบี้ย/เดือน (%)<input id="pw_interest_pct" inputmode="decimal" value="${esc(P.interest_pct)}"></label></div>
+      <div class="f3"><label>น้ำหนัก *<span class="row tight"><input id="pw_weight" inputmode="decimal" value="${esc(P.weight)}"><select id="pw_unit"><option value="baht" ${P.unit === 'baht' ? 'selected' : ''}>บาท</option><option value="g" ${P.unit === 'g' ? 'selected' : ''}>กรัม</option></select></span></label>
+        <label>% ทอง (คาด) *<input id="pw_est_pct" inputmode="decimal" value="${esc(P.est_pct)}"></label><label>จะไถ่ภายใน (วัน)<input id="pw_redeem_in" inputmode="numeric" value="${esc(P.redeem_in)}"></label></div>
+    </div></div>
+    <div><div class="card pw-calc" id="pwCalc"></div></div></div>`);
+  $('#pwBack').onclick = () => { S.pawnView = 'list'; renderPawn(); };
+  const rc = $('#readCard'); if (rc) rc.onclick = () => readCard((cu) => { P.customer = cu; renderPawnForm(); });
+  $('#pwManual').onclick = () => pawnManualCustomer(P);
+  ['pawnshop', 'ticket_no', 'pawn_date', 'due_date', 'principal', 'item_desc', 'metal', 'interest_pct', 'weight', 'unit', 'est_pct', 'redeem_in'].forEach(k => {
+    const el = $('#pw_' + k); el.oninput = el.onchange = () => { P[k] = el.value; drawPawnCalc(); }; });
+  $$('[data-ph]').forEach(inp => inp.onchange = async () => { const f = inp.files[0]; if (!f) return; try { P[inp.dataset.ph] = await resizeImageJpeg(f, 1100); renderPawnForm(); } catch (e) { toast('เปิดรูปไม่ได้', 'err'); } });
+  drawPawnCalc();
+}
+function resizeImageJpeg(file, max) {
+  return new Promise((res, rej) => { const img = new Image(); img.onload = () => { const r = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * r); c.height = Math.round(img.height * r); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); res(c.toDataURL('image/jpeg', .72)); URL.revokeObjectURL(img.src); }; img.onerror = rej; img.src = URL.createObjectURL(file); });
+}
+function drawPawnCalc() {
+  const P = S.pawn, k = pawnCalc(P), el = $('#pwCalc'); if (!el) return;
+  const cash = P.pay_cash === '' ? k.pay : Math.min(num(P.pay_cash), k.pay), tr = Math.max(0, k.pay - cash);
+  el.innerHTML = `<h2>คำนวณ</h2>
+    <div class="r"><span>มูลค่าทองตามราคาวันนี้ <span class="muted sm">(${gram(k.grams)} ก. @ ${esc(P.est_pct || '-')}%)</span></span><b>${money(k.value)}</b></div>
+    <div class="r neg"><span>− เงินต้นที่ต้องไถ่</span><span>${money(P.principal)}</span></div>
+    <div class="r neg"><span>− ดอกเบี้ยถึงวันไถ่ (${k.months} เดือน)</span><span>${money(k.interest)}</span></div>
+    <div class="r neg"><span>− ส่วนต่างร้าน (${esc(pawnCfg().margin_pct)}%)</span><span>${money(k.margin)}</span></div>
+    <div class="r tot"><span>แนะนำจ่ายลูกค้า</span><span>${money(k.suggest)}</span></div>
+    <label>ยอดจ่ายลูกค้าจริง (บาท)<input id="pw_pay" inputmode="decimal" value="${P.payEdited ? esc(P.pay) : k.suggest}"></label>
+    <div class="f2"><label>จ่ายเงินสด<input id="pw_pay_cash" inputmode="decimal" value="${esc(P.pay_cash === '' ? k.pay : P.pay_cash)}"></label><label>โอน<input value="${money(tr)}" disabled></label></div>
+    ${tr ? `<label>โอนเข้าบัญชี (ธนาคาร · เลขที่ · ชื่อ)<input id="pw_pay_bank" value="${esc(P.pay_bank)}"></label>` : ''}
+    <div class="gain ${k.profit < 0 ? 'bad' : ''}">กำไรคาดการณ์หลังไถ่ ≈ ${money(k.profit)} บาท</div>
+    <button class="btn gold block xl" id="pwSave" ${k.pay > 0 ? '' : 'disabled'}>✓ ลูกค้าเซ็นยืนยัน → บันทึก & พิมพ์</button>
+    <p class="muted sm">ต้องออนไลน์ · เงินสดหักจากลิ้นชักอัตโนมัติ</p>`;
+  $('#pw_pay').oninput = (e) => { P.pay = e.target.value; P.payEdited = true; const p = $('#pw_pay_cash'); if (P.pay_cash === '') p.value = num(e.target.value); };
+  $('#pw_pay').onchange = () => drawPawnCalc();
+  $('#pw_pay_cash').onchange = (e) => { P.pay_cash = e.target.value; drawPawnCalc(); };
+  if ($('#pw_pay_bank')) $('#pw_pay_bank').oninput = (e) => { P.pay_bank = e.target.value; };
+  $('#pwSave').onclick = () => savePawn();
+}
+function pawnManualCustomer(P) {
+  modal(`<h2>ข้อมูลผู้ขายตั๋ว</h2><label>ชื่อ-นามสกุล<input id="pmN" value="${esc((P.customer || {}).name || '')}" autofocus></label><label>เลขบัตรประชาชน 13 หลัก<input id="pmI" inputmode="numeric" maxlength="13" value="${esc((P.customer || {}).id_card || '')}"></label>
+    <div class="row end"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button><button class="btn gold" id="pmOk">ตกลง</button></div>`);
+  $('#pmOk').onclick = () => { const n = $('#pmN').value.trim(), i = $('#pmI').value.replace(/\D/g, ''); if (!n) return toast('ใส่ชื่อ', 'err'); if (i && !validThaiId(i)) return toast('เลขบัตรไม่ถูกต้อง', 'err');
+    P.customer = { name: n, id_card: i, source: 'manual' }; closeModal(); renderPawnForm(); };
+}
+async function savePawn() {
+  const P = S.pawn, k = pawnCalc(P);
+  if (!P.customer || !P.customer.name) return toast('อ่านบัตรผู้ขายตั๋วก่อน', 'err');
+  if (!String(P.ticket_no).trim()) return toast('ใส่เลขที่ตั๋ว', 'err');
+  if (num(P.principal) <= 0) return toast('ใส่เงินต้นในตั๋ว', 'err');
+  if (k.pay <= 0) return toast('ยอดจ่ายลูกค้าต้องมากกว่า 0', 'err');
+  if (!S.online || !S.session.token) return toast('ต้องออนไลน์เพื่อบันทึกตั๋วจำนำ', 'err');
+  const cash = P.pay_cash === '' ? k.pay : Math.min(num(P.pay_cash), k.pay);
+  signaturePad(async () => {
+    const body = { id: P.id, customer: P.customer, pawnshop: P.pawnshop, ticket_no: String(P.ticket_no).trim(), pawn_date: P.pawn_date, due_date: P.due_date,
+      principal: num(P.principal), interest_pct: num(P.interest_pct), metal: P.metal, item_desc: P.item_desc, est_weight: k.grams, est_pct: num(P.est_pct),
+      gold_value: k.value, interest_est: k.interest, margin: k.margin, pay_amount: k.pay, pay_cash: cash, pay_transfer: k.pay - cash, pay_bank: P.pay_bank,
+      photo_front: P.photo_front, photo_back: P.photo_back, signature: P.signature, signed_at: P.signed_at };
+    try {
+      const t = await api('pawn_create', { p_token: S.session.token, p_t: body });
+      toast('บันทึกตั๋ว ' + t.doc_no + ' แล้ว');
+      const full = { ...t, signature: P.signature, customer: P.customer };
+      S.pawn = null; S.pawnView = 'list'; S.pawnFilter = 'holding'; await renderPawn();
+      pawnSlip('buy', full);
+    } catch (e) { if (e.message === 'SESSION_INVALID') return sessionExpired(); toast('บันทึกไม่สำเร็จ: ' + errText(e), 'err'); }
+  }, { obj: P, title: 'ยืนยันขายตั๋วจำนำ / โอนสิทธิ์ตั๋ว', desc: `${P.pawnshop || ''} เลขที่ ${P.ticket_no} · ${P.item_desc || ''}`, amount: k.pay });
+}
+async function pawnDetail(id) {
+  let t; try { t = await api('pawn_get', { p_token: S.session.token, p_id: id }); } catch (e) { return toast(errText(e), 'err'); }
+  const c = t.customer || {}, hold = t.status === 'holding';
+  modal(`<h2>🎫 ${esc(t.ticket_no)} <span class="pwst ${(PAWN_ST[t.status] || ['', ''])[1]}">${(PAWN_ST[t.status] || [t.status])[0]}</span></h2>
+    <p class="muted sm">${esc(t.doc_no)} · ${esc(t.pawnshop || '')} · รับซื้อ ${esc(thDateTime(t.created_at))} โดย ${esc(t.staff_name || t.staff_code)}</p>
+    ${t.photo_front || t.photo_back ? `<div class="pw-photos">${[t.photo_front, t.photo_back].filter(Boolean).map(p => `<a href="${p}" target="_blank" class="pw-ph"><img src="${p}"></a>`).join('')}</div>` : ''}
+    <table class="brk"><tr><td>ผู้ขายตั๋ว</td><td>${esc(c.name || '')} <span class="sub">${esc(fmtId(c.id_card))}</span></td></tr>
+      <tr><td>ทรัพย์</td><td>${esc(t.item_desc || '')} · ${gram(t.est_weight)} ก. @ ${esc(t.est_pct)}%</td></tr>
+      <tr><td>จำนำ / ครบกำหนด</td><td>${t.pawn_date ? dueTh(t.pawn_date) : '-'} → <b>${t.due_date ? dueTh(t.due_date) : '-'}</b>${hold && t.days_left != null ? ` (เหลือ ${t.days_left} วัน)` : ''}</td></tr>
+      <tr><td>เงินต้น · ดอก/เดือน</td><td>${money(t.principal)} · ${esc(t.interest_pct)}%</td></tr>
+      <tr><td>จ่ายลูกค้า</td><td>${money(t.pay_amount)} <span class="sub">สด ${money(t.pay_cash)} · โอน ${money(t.pay_transfer)}</span></td></tr>
+      ${num(t.extra_cost) ? `<tr><td>ต่อดอกแล้ว</td><td>${money(t.extra_cost)}</td></tr>` : ''}
+      ${t.status === 'redeemed' ? `<tr><td>ไถ่แล้ว</td><td>${esc(thDateTime(t.redeemed_at))} · จ่าย ${money(t.redeem_paid)} · ได้ ${gram(t.redeem_weight)} ก. @ ${esc(t.redeem_pct)}% → ทุนรวม ${money(num(t.cost) + num(t.redeem_paid))}</td></tr>` : ''}
+      ${t.status === 'sold' ? `<tr><td>ขายแล้ว</td><td>${esc(thDateTime(t.sold_at))} · ${money(t.sold_price)} ให้ ${esc((t.buyer || {}).name || '')} · กำไร ${money(num(t.sold_price) - num(t.cost))}</td></tr>` : ''}
+      ${t.status === 'void' ? `<tr><td>ยกเลิก</td><td>${esc(t.void_reason || '')}</td></tr>` : ''}</table>
+    ${hold ? `<div class="act4"><button class="btn" id="pdRedeem">🏦 บันทึกไถ่ทอง</button><button class="btn gold" id="pdSell">💱 ขายตั๋วต่อ</button><button class="btn ghost" id="pdRenew">🔁 ต่อดอก</button>${isOwner() ? '<button class="btn ghost danger" id="pdVoid">ยกเลิกรายการ</button>' : ''}</div>` : ''}
+    <div class="row end"><button class="btn ghost" onclick="closeModal()">ปิด</button><button class="btn ghost" id="pdPrint">🖨️ พิมพ์ใบรับซื้อตั๋วซ้ำ</button></div>`, { wide: true });
+  $('#pdPrint').onclick = () => pawnSlip('buy', t);
+  if (!hold) return;
+  $('#pdRedeem').onclick = () => pawnRedeemModal(t);
+  $('#pdSell').onclick = () => pawnSellModal(t);
+  $('#pdRenew').onclick = () => pawnRenewModal(t);
+  if ($('#pdVoid')) $('#pdVoid').onclick = async () => { const r = prompt('เหตุผลที่ยกเลิก (เช่น บันทึกผิด) — เงินสดจะคืนเข้าลิ้นชักในสรุป'); if (!r) return;
+    try { await api('pawn_void', { p_token: S.session.token, p_id: t.id, p_reason: r }); toast('ยกเลิกแล้ว'); closeModal(); renderPawn(); } catch (e) { toast(errText(e), 'err'); } };
+}
+function pawnRedeemModal(t) {
+  const months = t.pawn_date ? Math.max(1, Math.ceil(daysBetween(t.pawn_date, bkkDate()) / 30)) : 1;
+  const est = num(t.principal) + Math.ceil(num(t.principal) * num(t.interest_pct) / 100 * months);
+  modal(`<h2>🏦 บันทึกไถ่ทอง · ${esc(t.ticket_no)}</h2><p class="muted sm">ทองที่ได้จะเข้าสต๊อก "รอหลอม" พร้อมต้นทุนรวม (ค่าตั๋ว + ต่อดอก + ค่าไถ่)</p>
+    <div class="f2"><label>จ่ายโรงรับจำนำ (ต้น+ดอก)<input id="rdPaid" inputmode="decimal" value="${est}"></label><label>จ่ายเป็นเงินสด<input id="rdCash" inputmode="decimal" value="${est}"></label></div>
+    <div class="f3"><label>ชื่อชิ้นงาน<input id="rdKind" value="${esc(t.item_desc || '')}"></label><label>น้ำหนักที่ได้ (กรัม)<input id="rdW" inputmode="decimal" value="${esc(t.est_weight || '')}"></label><label>% วัดจริง<input id="rdP" inputmode="decimal" value="${esc(t.est_pct || '')}"></label></div>
+    <div class="gain" id="rdCost"></div>
+    <div class="row end"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button><button class="btn" id="rdOk">บันทึกไถ่ + เข้าสต๊อก</button></div>`);
+  const upd = () => { $('#rdCost').textContent = `ทุนรวม ${money(num(t.cost) + num($('#rdPaid').value))} บาท · ${num($('#rdW').value) ? money((num(t.cost) + num($('#rdPaid').value)) / num($('#rdW').value), 2) + ' บาท/กรัม' : ''}`; };
+  $$('#rdPaid,#rdW').forEach(x => x.oninput = upd); upd();
+  $('#rdOk').onclick = async (ev) => { if (num($('#rdW').value) <= 0) return toast('ใส่น้ำหนักที่ได้', 'err'); busy(ev.target, true);
+    try { await api('pawn_redeem', { p_token: S.session.token, p_id: t.id, p_paid: num($('#rdPaid').value), p_cash: num($('#rdCash').value), p_weight: num($('#rdW').value), p_pct: num($('#rdP').value), p_kind: $('#rdKind').value });
+      toast('ไถ่แล้ว · ทองเข้าสต๊อก'); closeModal(); renderPawn(); } catch (e) { busy(ev.target, false); toast(errText(e), 'err'); } };
+}
+function pawnSellModal(t) {
+  const B = { customer: null, price: Math.ceil((num(t.cost) * 1.05) / 100) * 100 };
+  const draw = () => modal(`<h2>💱 ขายตั๋วต่อ · ${esc(t.ticket_no)}</h2><p class="muted sm">ทุนตั๋ว ${money(t.cost)} บาท</p>
+    <div class="card">${B.customer ? `<b>${esc(B.customer.name)}</b> <span class="muted sm">${esc(fmtId(B.customer.id_card))}</span>` : `<button class="btn gold" id="readCard">อ่านบัตรผู้ซื้อ</button> <span class="muted sm" id="cardHint"></span>`} <button class="btn ghost sm" id="sbMan">พิมพ์เอง</button></div>
+    <div class="f2"><label>ราคาขายตั๋ว<input id="sbP" inputmode="decimal" value="${B.price}"></label><label>รับเงิน<select id="sbM"><option value="cash">เงินสด</option><option value="transfer">โอน</option></select></label></div>
+    <div class="gain" id="sbG"></div>
+    <div class="row end"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button><button class="btn gold" id="sbOk">ขายตั๋ว → พิมพ์ใบขาย</button></div>`, { sticky: true });
+  const bind = () => {
+    const g = () => { $('#sbG').textContent = `กำไรจากการขายตั๋ว ${money(num($('#sbP').value) - num(t.cost))} บาท`; }; $('#sbP').oninput = (e) => { B.price = e.target.value; g(); }; g();
+    const rc = $('#readCard'); if (rc) rc.onclick = () => readCard((cu) => { B.customer = cu; draw(); bind(); });
+    $('#sbMan').onclick = () => { const n = prompt('ชื่อผู้ซื้อตั๋ว'); if (!n) return; const i = (prompt('เลขบัตร (ไม่บังคับ)') || '').replace(/\D/g, ''); B.customer = { name: n, id_card: i }; draw(); bind(); };
+    $('#sbOk').onclick = async (ev) => { if (!B.customer) return toast('ใส่ข้อมูลผู้ซื้อ', 'err'); if (num(B.price) <= 0) return toast('ใส่ราคา', 'err'); busy(ev.target, true);
+      try { const r = await api('pawn_sell', { p_token: S.session.token, p_id: t.id, p_price: num(B.price), p_method: $('#sbM').value, p_buyer: B.customer });
+        toast('ขายตั๋วแล้ว'); closeModal(); await renderPawn(); pawnSlip('sell', { ...t, ...r, buyer: B.customer }); } catch (e) { busy(ev.target, false); toast(errText(e), 'err'); } };
+  };
+  draw(); bind();
+}
+function pawnRenewModal(t) {
+  const months = t.pawn_date ? Math.max(1, Math.ceil(daysBetween(t.pawn_date, bkkDate()) / 30)) : 1, est = Math.ceil(num(t.principal) * num(t.interest_pct) / 100 * months);
+  modal(`<h2>🔁 ต่อดอก · ${esc(t.ticket_no)}</h2><p class="muted sm">จ่ายดอกเบี้ยให้โรงรับจำนำ แล้วเลื่อนวันครบกำหนด · ค่าต่อดอกรวมเข้าทุนตั๋ว</p>
+    <div class="f2"><label>ดอกเบี้ยที่จ่าย<input id="rnP" inputmode="decimal" value="${est}"></label><label>จ่ายเงินสด<input id="rnC" inputmode="decimal" value="${est}"></label></div>
+    <div class="f2"><label>วันที่เริ่มนับใหม่<input type="date" id="rnD" value="${bkkDate()}"></label><label>ครบกำหนดใหม่<input type="date" id="rnDue" value="${esc(t.due_date || '')}"></label></div>
+    <div class="row end"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button><button class="btn" id="rnOk">บันทึกต่อดอก</button></div>`);
+  $('#rnOk').onclick = async (ev) => { if (!$('#rnDue').value) return toast('ใส่วันครบกำหนดใหม่', 'err'); busy(ev.target, true);
+    try { await api('pawn_renew', { p_token: S.session.token, p_id: t.id, p_paid: num($('#rnP').value), p_cash: num($('#rnC').value), p_pawn_date: $('#rnD').value || null, p_due: $('#rnDue').value });
+      toast('บันทึกต่อดอกแล้ว'); closeModal(); renderPawn(); } catch (e) { busy(ev.target, false); toast(errText(e), 'err'); } };
+}
+// ใบรับซื้อตั๋ว / ใบขายตั๋ว — ดูตัวใหญ่ แล้วพิมพ์บลูทูธหรือหน้าต่าง Chrome
+function pawnSlip(kind, t) {
+  const c = t.customer || {}, b = t.buyer || {}, sell = kind === 'sell', staff = t.staff_name || staffFull(t.staff_code) || '';
+  const html = `${slipHead(sell ? 'ใบขายตั๋วจำนำ' : 'ใบรับซื้อตั๋วจำนำ')}
+    <div class="r-row"><span>เลขที่</span><b>${esc(t.doc_no)}</b></div><div class="r-row"><span>วันที่</span><span>${esc(thDateTime(sell ? (t.sold_at || now()) : t.created_at))}</span></div><div class="r-hr"></div>
+    <div class="r-b">${sell ? 'ผู้ซื้อ' : 'ผู้ขาย'}: ${esc(sell ? b.name || '' : c.name || '')}</div><div class="r-s">เลขบัตร ${esc(fmtId(sell ? b.id_card : c.id_card))}</div><div class="r-hr"></div>
+    <div class="r-b">ตั๋ว ${esc(t.ticket_no)}</div><div class="r-s">${esc(t.pawnshop || '')}</div>
+    <div class="r-row r-s"><span>จำนำ</span><span>${t.pawn_date ? dueTh(t.pawn_date) : '-'}</span></div><div class="r-row r-s"><span>ครบกำหนด</span><span>${t.due_date ? dueTh(t.due_date) : '-'}</span></div>
+    <div class="r-row r-s"><span>เงินต้น</span><span>${money(t.principal)}</span></div><div class="r-s">${esc(t.item_desc || '')}</div><div class="r-hr"></div>
+    ${sell ? `<div class="r-row r-b r-l"><span>ราคาขายตั๋ว</span><span>${money(t.sold_price)}</span></div>`
+      : `<div class="r-row r-b r-l"><span>จ่ายผู้ขาย</span><span>${money(t.pay_amount)}</span></div>${num(t.pay_cash) ? `<div class="r-row r-s"><span>เงินสด</span><span>${money(t.pay_cash)}</span></div>` : ''}${num(t.pay_transfer) ? `<div class="r-row r-s"><span>โอน</span><span>${money(t.pay_transfer)}</span></div>` : ''}`}
+    <div class="r-hr"></div><div class="r-s r-j">${sell ? 'ผู้ซื้อรับตั๋วจำนำข้างต้นไว้แล้ว และรับทราบเงื่อนไข/วันครบกำหนดของโรงรับจำนำ' : 'ข้าพเจ้าขอโอนสิทธิ์ในตั๋วจำนำข้างต้นให้ร้าน และยืนยันว่าเป็นผู้จำนำตัวจริง ทรัพย์ในตั๋วเป็นของข้าพเจ้าโดยชอบด้วยกฎหมาย'}</div>
+    ${!sell && t.signature ? `<div class="r-sigimg"><img src="${t.signature}"></div>` : ''}
+    <div class="r-sign"><span>ลงชื่อ</span><i></i><span>${sell ? 'ผู้ซื้อ' : 'ผู้ขาย'}</span></div><div class="r-c r-s">(${esc(sell ? b.name || '' : c.name || '')})</div>
+    <div class="r-sign"><span>ลงชื่อ</span><i><b class="r-bname">${esc(staff)}</b></i><span>${sell ? 'ผู้ขาย' : 'ผู้รับซื้อ'}</span></div>`;
+  const opsFn = async () => {
+    const shop = S.settings.shop || {}, logo = await imgLoad(shop.logo), lg = logo && monoLogo(logo), sig = !sell && t.signature ? await imgLoad(t.signature) : null;
+    const ops = [], T = (x, o = {}) => x != null && x !== '' && ops.push({ k: 't', t: String(x), ...o }), LR = (a, r, o = {}) => ops.push({ k: 'lr', a: String(a), r: String(r), ...o }), HR = () => ops.push({ k: 'hr' }), SP = (h) => ops.push({ k: 'sp', h });
+    if (lg) ops.push({ k: 'img', im: lg, w: 180, maxh: 100 });
+    T(shop.name, { s: 30, b: 1, c: 1 }); T(shop.branch, { s: 20, c: 1 }); if (shop.phone) T('โทร ' + shop.phone + (shop.line ? ' · LINE ' + shop.line : ''), { s: 18, c: 1 }); HR();
+    T(sell ? 'ใบขายตั๋วจำนำ' : 'ใบรับซื้อตั๋วจำนำ', { s: 28, b: 1, c: 1 }); LR('เลขที่', t.doc_no, { b: 1 }); LR('วันที่', thDateTime(sell ? (t.sold_at || now()) : t.created_at)); HR();
+    T((sell ? 'ผู้ซื้อ: ' : 'ผู้ขาย: ') + ((sell ? b.name : c.name) || ''), { b: 1, wrap: 1 }); T('เลขบัตร ' + fmtId(sell ? b.id_card : c.id_card), { s: 20 }); HR();
+    T('ตั๋ว ' + t.ticket_no, { b: 1 }); T(t.pawnshop, { s: 20, wrap: 1 }); LR('จำนำ', t.pawn_date ? dueTh(t.pawn_date) : '-', { s: 20 }); LR('ครบกำหนด', t.due_date ? dueTh(t.due_date) : '-', { s: 20 }); LR('เงินต้น', money(t.principal), { s: 20 }); T(t.item_desc, { s: 20, wrap: 1 }); HR();
+    if (sell) LR('ราคาขายตั๋ว', money(t.sold_price) + ' บาท', { s: 26, b: 1 });
+    else { LR('จ่ายผู้ขาย', money(t.pay_amount) + ' บาท', { s: 26, b: 1 }); if (num(t.pay_cash)) LR('เงินสด', money(t.pay_cash)); if (num(t.pay_transfer)) LR('โอน', money(t.pay_transfer)); }
+    HR(); T(sell ? 'ผู้ซื้อรับตั๋วจำนำข้างต้นไว้แล้ว และรับทราบเงื่อนไข/วันครบกำหนดของโรงรับจำนำ' : 'ข้าพเจ้าขอโอนสิทธิ์ในตั๋วจำนำข้างต้นให้ร้าน และยืนยันว่าเป็นผู้จำนำตัวจริง ทรัพย์ในตั๋วเป็นของข้าพเจ้าโดยชอบด้วยกฎหมาย', { s: 18, wrap: 1 });
+    if (sig) { SP(10); ops.push({ k: 'img', im: sig, w: 230, maxh: 90 }); SP(-26); } else SP(34);
+    ops.push({ k: 'sign', a: 'ลงชื่อ', r: sell ? 'ผู้ซื้อ' : 'ผู้ขาย' }); T('(' + ((sell ? b.name : c.name) || '') + ')', { s: 18, c: 1 });
+    SP(16); ops.push({ k: 'sign', a: 'ลงชื่อ', r: sell ? 'ผู้ขาย' : 'ผู้รับซื้อ', mid: staff });
+    HR(); T(shop.footer, { s: 20, c: 1, wrap: 1 }); T(t.doc_no, { s: 18, c: 1 }); SP(10);
+    return ops;
+  };
+  const title = `${t.doc_no} ${sell ? 'ขายตั๋ว' : 'รับซื้อตั๋ว'} ${(sell ? b.name : c.name) || ''}`.trim();
+  modal(`<div class="rcpt-preview big"><div class="rcpt">${html}</div></div>
+    <div class="row end"><button class="btn ghost" onclick="closeModal()">ปิด</button><button class="btn ghost" id="slipPdf">PDF / หน้าต่าง Chrome</button>${navigator.bluetooth ? '<button class="btn gold" id="slipBt">🖨️ พิมพ์บลูทูธ</button>' : ''}</div>`, { wide: true });
+  $('#slipPdf').onclick = () => { closeModal(); printSlip(html, title); };
+  if ($('#slipBt')) $('#slipBt').onclick = async (ev) => { busy(ev.target, true); const ok = await btPrintOps(opsFn); busy(ev.target, false); if (ok) closeModal(); };
+}
+// แจ้งเตือนตั๋วใกล้ครบ (เช็กทุก 30 นาทีขณะเปิดแอป)
+async function pawnAlertTick() { if (!S.session || !S.session.token || !S.online) return; try { await api('pawn_alerts', { p_token: S.session.token }); } catch (e) { /* ignore */ } }
+setInterval(pawnAlertTick, 30 * 60e3); setTimeout(pawnAlertTick, 20e3);
 
 // ---------------------------------------------------------------- BILLS / summary
 async function loadBills(date) {
@@ -2125,7 +2361,8 @@ async function renderBills() {
   sumCache = { d, bills };
   const M = metals(), V = d.view || { sales: true, profit: true, pending: true };
   // ---- เงินออก
-  const okBills = d.bills.filter(b => b.status !== 'void');
+  const okBills = d.bills.filter(b => b.status !== 'void' && b.kind !== 'pawn');
+  const pawnEv = d.pawn || [], pawnOut = pawnEv.filter(e => e.cash_dir < 0).reduce((t, e) => t + num(e.amount), 0), pawnIn = pawnEv.filter(e => e.cash_dir > 0).reduce((t, e) => t + num(e.amount), 0);
   const buyTotal = okBills.reduce((t, b) => t + num(b.total), 0), buyCash = okBills.reduce((t, b) => t + num(b.pay_cash), 0), buyTr = okBills.reduce((t, b) => t + num(b.pay_transfer), 0);
   const buyW = okBills.reduce((t, b) => t + (b.items || []).reduce((s, i) => s + num(i.weight), 0), 0);
   const meltCost = d.melts.filter(m => m.status !== 'cancelled').reduce((t, m) => t + num(m.melt_cost), 0), meltN = d.melts.filter(m => m.status !== 'cancelled' && num(m.melt_cost)).length;
@@ -2133,10 +2370,10 @@ async function renderBills() {
   const transCost = transLots.reduce((t, r) => t + num(r.transport_cost), 0);
   const shopExpSales = d.sales.filter(x => x.status !== 'cancelled' && x.buyer_type !== 'refinery' && (num(x.transport_cost) + num(x.other_cost)));
   const shopExp = shopExpSales.reduce((t, x) => t + num(x.transport_cost) + num(x.other_cost), 0);
-  const outTotal = buyTotal + meltCost + transCost + shopExp;
+  const outTotal = buyTotal + meltCost + transCost + shopExp + pawnOut;
   // ---- เงินเข้า
   const fees = d.fees || [], feeTotal = fees.reduce((t, x) => t + num(x.fee), 0);
-  const inTotal = d.paid.reduce((t, x) => t + saleReceived(x), 0) + feeTotal, inN = d.paid.length + fees.length;
+  const inTotal = d.paid.reduce((t, x) => t + saleReceived(x), 0) + feeTotal + pawnIn, inN = d.paid.length + fees.length + pawnEv.filter(e => e.cash_dir > 0).length;
   const cashIn = d.paid.filter(x => x.pay_method === 'cash').reduce((t, x) => t + saleReceived(x), 0);
   // ---- รอรับเงิน
   const pend = d.pending.map(x => ({ ...x, exp: saleExpected(x) }));
@@ -2151,7 +2388,9 @@ async function renderBills() {
   const notesBy = {}; d.notes.forEach(n => { (notesBy[n.ref_id] = notesBy[n.ref_id] || []).push(n); });
   // ---- รายการ (timeline)
   const ev = [];
-  d.bills.forEach(b => ev.push({ kind: b.status === 'void' ? 'void' : 'buy', group: 'buy', at: b.created_at, ref: 'bill', id: b.id, title: `รับซื้อ ${b.bill_no}`, staff: b.staff_code + (b.approved_code ? ` · อนุมัติโดย ${b.approved_code}` : ''),
+  pawnEv.forEach(e => ev.push({ kind: e.cash_dir > 0 ? 'sell' : 'buy', group: e.cash_dir > 0 ? 'sell' : 'buy', at: e.at, ref: 'pawn', id: 'pw' + e.at, title: `${PAWN_EV[e.kind] || e.kind} ${e.doc_no}`, staff: e.staff_code,
+    sub: `🎫 ${e.pawnshop || ''} เลขที่ ${e.ticket_no || ''} · ${e.item_desc || ''}${e.customer_name ? ' · ' + e.customer_name : ''}`, amt: e.cash_dir > 0 ? num(e.amount) : -num(e.amount), amtSub: num(e.cash) ? (num(e.cash) === num(e.amount) ? 'เงินสด' : `สด ${money(e.cash)}`) : 'โอน' }));
+  d.bills.filter(b => b.kind !== 'pawn').forEach(b => ev.push({ kind: b.status === 'void' ? 'void' : 'buy', group: 'buy', at: b.created_at, ref: 'bill', id: b.id, title: `รับซื้อ ${b.bill_no}`, staff: b.staff_code + (b.approved_code ? ` · อนุมัติโดย ${b.approved_code}` : ''),
     sub: b.status === 'void' ? `เหตุผล: ${b.void_reason || '-'}` : `${b.customer_name || ''} · ${(b.items || []).map(i => `${M[i.metal] ? M[i.metal].label : i.metal} ${i.pct}% ${gram(i.weight)} ก.${i.destination ? ' · ' + (DEST_LABEL[i.destination] || '') : ''}`).join(', ')}`,
     amt: -num(b.total), amtSub: b.status === 'void' ? '' : (num(b.pay_cash) && num(b.pay_transfer) ? `สด ${money(b.pay_cash)} · โอน ${money(b.pay_transfer)}` : num(b.pay_cash) ? 'เงินสด' : 'โอน'), voided: b.status === 'void' }));
   d.melts.forEach(m => ev.push({ kind: 'melt', group: 'melt', at: m.created_at, ref: 'melt', id: m.id, title: `${m.source === 'merge' ? 'รวมก้อน' : 'หลอม'} ${m.lot_no}`, staff: m.staff_code,
@@ -2184,7 +2423,7 @@ async function renderBills() {
     <div class="kpi out"><span>💸 เงินออก${S.billsDate === bkkDate() ? 'วันนี้' : ''}</span><b>−${money(outTotal)}</b><small>รับซื้อ ${okBills.length} บิล + ค่าใช้จ่าย</small></div>
     ${V.sales ? `<div class="kpi"><span>สุทธิ${S.billsDate === bkkDate() ? 'วันนี้' : ''}</span><b class="${inTotal - outTotal >= 0 ? 'okc' : 'bad'}">${inTotal - outTotal >= 0 ? '+' : '−'}${money(Math.abs(inTotal - outTotal))}</b><small>เงินเข้า − เงินออก</small></div>` : ''}
     ${V.pending ? `<div class="kpi wait"><span>⏳ รอรับเงิน</span><b>${money(sumP(pend))}</b><small>${pend.length} รายการ${overdue ? ` · เลยกำหนด ${overdue}` : ''}</small></div>` : ''}
-    <div class="kpi cash"><span>💵 เงินสดในลิ้นชัก (คาด)</span><b class="${drawer < 0 ? 'bad' : ''}">${money(drawer)}</b><small>เงินตั้งต้น ${money(d.drawer ? d.drawer.float : d.drawer_float)} − จ่ายรับซื้อเงินสด ${money(d.drawer ? d.drawer.cash_buy : buyCash)}${V.sales ? ' + ขายได้เงินสด' : ''} − ค่าใช้จ่าย</small></div>
+    <div class="kpi cash"><span>💵 เงินสดในลิ้นชัก (คาด)</span><b class="${drawer < 0 ? 'bad' : ''}">${money(drawer)}</b><small>เงินตั้งต้น ${money(d.drawer ? d.drawer.float : d.drawer_float)} − จ่ายรับซื้อเงินสด ${money(d.drawer ? d.drawer.cash_buy : buyCash)}${V.sales ? ' + ขายได้เงินสด' : ''} − ค่าใช้จ่าย${d.drawer && num(d.drawer.pawn_cash) ? ` ${num(d.drawer.pawn_cash) < 0 ? '−' : '+'} ตั๋วจำนำ ${money(Math.abs(num(d.drawer.pawn_cash)))}` : ''}</small></div>
   </div>
   <div class="two">
     <div class="card"><div class="card-h"><h2>💸 เงินออก</h2><span class="muted sm">แยกช่องทาง</span></div>
@@ -2195,6 +2434,7 @@ async function renderBills() {
         ${transCost ? `<tr><td>ค่าขนส่งไปโรงสกัด <span class="sub">· ${transLots.map(r => esc(r.lot_no)).join(', ')}</span></td><td class="out-t">${money(transCost)}</td></tr>` : ''}
         ${meltCost ? `<tr><td>ค่าหลอม <span class="sub">· ${meltN} ก้อน</span></td><td class="out-t">${money(meltCost)}</td></tr>` : ''}
         ${shopExp ? `<tr><td>ค่าใช้จ่ายการขาย <span class="sub">· ${shopExpSales.map(x => esc(x.sale_no)).join(', ')}</span></td><td class="out-t">${money(shopExp)}</td></tr>` : ''}
+        ${pawnOut ? `<tr><td>🎫 ตั๋วจำนำ (ซื้อตั๋ว/ต่อดอก/ไถ่) <span class="sub">· ${pawnEv.filter(e => e.cash_dir < 0).length} รายการ</span></td><td class="out-t">${money(pawnOut)}</td></tr>` : ''}
         <tr class="tot"><td>รวมเงินออก</td><td class="out-t">${money(outTotal)}</td></tr>
       </table></div>
     ${V.sales ? `<div class="card"><div class="card-h"><h2>💰 เงินเข้า</h2><span class="muted sm">เฉพาะที่ได้รับเงินแล้ว</span></div>
@@ -2202,7 +2442,8 @@ async function renderBills() {
         ${d.paid.map(x => `<tr><td>${x.buyer_type === 'refinery' ? '🏭 รับเงินจากโรงสกัด' : '🏪 ขายร้านรับซื้อ'} <span class="sub">· ${esc(x.sale_no)} ${esc(x.buyer_name)}${bkkDate(x.created_at) !== S.billsDate ? ` (ขายเมื่อ ${shortTh(bkkDate(x.created_at))})` : ''}</span></td><td class="in-t">${money(saleReceived(x))}</td></tr>
           <tr><td><span class="sub">↳ ${esc(PAY_TH[x.pay_method] || x.pay_method || '-')}</span></td><td><span class="sub">${money(saleReceived(x))}</span></td></tr>`).join('')}
         ${fees.map(x => `<tr><td>🔥 ค่าหลอม (ลูกค้าไม่ขาย คืนก้อนทอง) <span class="sub">· ${esc(x.job_no)} ${esc(x.customer_name || '')}</span></td><td class="in-t">+${money(x.fee)}</td></tr>`).join('')}
-        ${!d.paid.length && !fees.length ? '<tr><td class="muted">ยังไม่มีเงินเข้า</td><td></td></tr>' : ''}
+        ${pawnEv.filter(e => e.cash_dir > 0).map(e => `<tr><td>🎫 ขายตั๋วจำนำ <span class="sub">· ${esc(e.doc_no)} ${esc(e.ticket_no || '')}</span></td><td class="in-t">+${money(e.amount)}</td></tr>`).join('')}
+        ${!d.paid.length && !fees.length && !pawnIn ? '<tr><td class="muted">ยังไม่มีเงินเข้า</td><td></td></tr>' : ''}
         <tr class="tot"><td>รวมเงินเข้า</td><td class="in-t">${money(inTotal)}</td></tr>
       </table></div>` : ''}
   </div>
@@ -2542,6 +2783,11 @@ function renderSettings() {
       <label>เงินตั้งต้นในลิ้นชักทุกวัน (บาท)<input id="drFloat" inputmode="decimal" value="${esc(((S.settings && S.settings.drawer) || {}).float ?? 50000)}"></label>
       <p class="muted sm">เงินสดในลิ้นชักเริ่มวันละเท่านี้ทุกวัน แล้วลดลงทุกครั้งที่จ่ายรับซื้อเป็นเงินสด (ยืนยันด้วย PIN) และค่าหลอม/ค่าขนส่ง/ค่าใช้จ่ายการขาย · เพิ่มขึ้นเมื่อขายได้เงินสด · ตอนยืนยันบิลจะเห็นยอดเงินสดคงเหลือ และเตือนถ้าเงินในลิ้นชักไม่พอ</p>
       <button class="btn gold block" id="saveDr">บันทึก</button></div>
+      <div class="card"><div class="card-h"><h2>🎫 ตั๋วจำนำ</h2></div>
+      <div class="f2"><label>ส่วนต่างร้าน (% ของมูลค่าทอง)<input id="pwMargin" inputmode="decimal" value="${esc(pawnCfg().margin_pct)}"></label><label>ดอกเบี้ยเริ่มต้น/เดือน (%)<input id="pwInt" inputmode="decimal" value="${esc(pawnCfg().interest_pct)}"></label></div>
+      <label>รายชื่อโรงรับจำนำ (คั่นด้วย ,)<input id="pwShopsIn" value="${esc(pawnCfg().shops.join(', '))}"></label>
+      <p class="muted sm">ใช้คำนวณ "แนะนำจ่ายลูกค้า" = มูลค่าทองวันนี้ − เงินต้น − ดอกเบี้ยถึงวันไถ่ − ส่วนต่างร้าน · แก้ยอดจริงได้ทุกครั้ง · ดอกเบี้ยแก้ได้ในแต่ละตั๋ว</p>
+      <button class="btn gold block" id="savePw">บันทึก</button></div>
       <div class="card"><div class="card-h"><h2>สิ่งที่พนักงานเห็นในหน้าสรุป</h2></div>
       <label class="switch"><input type="checkbox" id="svSales" ${sv.sales ? 'checked' : ''}> <b>ยอดขาย / เงินเข้า</b></label>
       <label class="switch"><input type="checkbox" id="svProfit" ${sv.profit ? 'checked' : ''}> <b>กำไร และทุนของ</b></label>
@@ -2610,6 +2856,7 @@ function renderSettings() {
   } else if (setTab === 'sale') {
     $('#saveSl').onclick = (ev) => save('sale', { staff_can_sell: $('#slStaff').checked }, ev.target);
     $('#saveDr').onclick = (ev) => save('drawer', { float: Math.max(0, num($('#drFloat').value)) }, ev.target);
+    $('#savePw').onclick = (ev) => save('pawn', { margin_pct: Math.max(0, num($('#pwMargin').value)), interest_pct: Math.max(0, num($('#pwInt').value)), shops: $('#pwShopsIn').value.split(',').map(x => x.trim()).filter(Boolean) }, ev.target);
     $('#saveSv').onclick = (ev) => save('staff_view', { sales: $('#svSales').checked, profit: $('#svProfit').checked, pending: $('#svPending').checked }, ev.target);
   } else if (setTab === 'line') {
     lineTab();
